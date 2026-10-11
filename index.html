@@ -102,6 +102,9 @@ legend{font-weight:700;padding:0 6px;font-size:11px;letter-spacing:.12em;text-tr
 .vopt{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:6px 9px}
 button.vopt:hover{background:var(--blush)}
 .vopt small{color:var(--mute)}
+.seg{display:inline-flex;border:1.5px solid rgba(255,255,255,.75);border-radius:6px;overflow:hidden}
+.seg button{background:transparent;border:0;color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:6px 12px;min-height:34px}
+.seg button.on{background:#fff;color:var(--maroon)}
 .foot{height:14px;background:var(--footer);margin:40px -16px 0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:6px;z-index:90;max-width:90vw}
 </style>
@@ -177,7 +180,8 @@ async function boot(){
 
 function render(){
   const root=$('#app');
-  const head=`<div style="display:flex;justify-content:flex-end;padding-top:10px"><button class="btn sm" data-act="lang">${lang==='zh'?'EN':'中文'}</button></div>`;
+  const seg=`<div class="seg" role="group" aria-label="Language"><button data-act="lang" data-v="zh" class="${lang==='zh'?'on':''}">中文</button><button data-act="lang" data-v="en" class="${lang==='en'?'on':''}">EN</button></div>`;
+  const head=`<div class="top"><div class="ttl"><span class="brand">POLLISUM</span><h1>${L('维修工作安排板','Mechanic Job Board')}</h1></div><div class="grp">${seg}</div></div>`;
   if(dbFail){root.innerHTML=`<div class="wrap">${head}<div class="auth"><h2>${L('无法连接数据库','Cannot reach the database')}</h2><p class="sub">${L('请检查网络后刷新页面。','Check your connection and refresh the page.')}</p></div></div>`;return}
   if(!ready.u){root.innerHTML=`<div class="wrap">${head}<div class="auth"><p class="sub">${L('加载中…','Loading…')}</p></div></div>`;return}
   if(!me){root.innerHTML=`<div class="wrap">${head}${authView()}</div>`;return}
@@ -187,7 +191,7 @@ function render(){
   root.innerHTML=`<div class="wrap">
   <div class="top"><div class="ttl"><span class="brand">POLLISUM</span><h1>${L('维修工作安排板','Mechanic Job Board')}</h1></div>
    <div class="grp">
-    <button class="btn lang" data-act="lang">${lang==='zh'?'EN':'中文'}</button>
+    ${seg}
     ${real?`<button class="btn demo" data-act="demo" title="${L('切换演示角色','Switch demo role')}">${L('演示角色','Demo role')}: ${esc(rname(eff()))}</button>`:''}
     <button class="btn sw" data-act="switch">${L('切换','Switch')}</button>
     <button class="btn out" data-act="logout">${L('退出','Log out')}</button>
@@ -389,7 +393,7 @@ async function leave(forget){
 
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,v=b.dataset.v;
-  if(a==='lang'){lang=lang==='zh'?'en':'zh';ls('mech_lang',lang);const o=$('#ov');o&&o.remove();render()}
+  if(a==='lang'){lang=v||(lang==='zh'?'en':'zh');ls('mech_lang',lang);const o=$('#ov');o&&o.remove();render()}
   else if(a==='demo'){const n=ROLES[(ROLES.indexOf(eff())+1)%3];demo=n==='admin'?null:n;tab='board';render()}
   else if(a==='switch')leave(false);
   else if(a==='logout')leave(true);
