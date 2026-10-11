@@ -1,8 +1,8 @@
 # Mechanic 维修工作板
 
-Vehicle repair job board (中文 / EN), styled to the Pollisum style guide.
+Vehicle repair job board (中文 / EN), styled to the Pollisum style guide. Static page (`index.html`) + Supabase backend.
 
-- `index.html`: the whole app in one file, with the 512-vehicle list from Book1.xlsx embedded.
-- Needs the claude.ai Artifact `db` runtime (shared `users` and `cases` collections) to store data. Opened outside that runtime it shows "cannot reach the database".
-- Roles: Admin, Mechanic, Operation. The first person to register becomes Admin; everyone else needs approval.
-- Permissions are enforced in the page, not in the database.
+- Backend: Supabase project `mechanic-board` (tables `profiles`, `cases` with row-level security; edge function `account` for register / update user / delete user).
+- Login is phone number + password (stored as a synthetic email `p<digits>@mechanic.invalid`). The first person to register becomes Admin; everyone else waits for Admin approval.
+- Roles: Admin, Mechanic, Operation. Permissions are enforced by row-level security and the edge function.
+- The 512-vehicle list from Book1.xlsx is embedded in `index.html`.
