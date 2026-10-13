@@ -276,7 +276,7 @@ function usersView(){
   const us={pending:[L('待批准','Pending'),38],approved:[L('已批准','Approved'),145],rejected:[L('已拒绝','Rejected'),0]};
   return `<div class="tw"><table><thead><tr>${[L('姓名','Name'),L('手机号码','Phone'),L('角色','Role'),L('状态','Status'),L('注册日期','Registered date'),L('注册时间','Registered time'),L('操作','Actions')].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>
   ${rows.map(u=>`<tr><td><b>${esc(u.name)}</b></td><td class="mono">${esc(u.phone)}</td><td>${rChip(u.role)}</td><td><span class="st" style="--h:${us[u.status]?us[u.status][1]:0}">${esc((us[u.status]||[u.status])[0])}</span></td><td>${fD(u.createdAt)}</td><td>${fT(u.createdAt)}</td>
-  <td class="act">${u.status==='pending'?`<button class="btn sm pri" data-act="uapprove" data-v="${u.id}">${L('批准','Approve')}</button><button class="btn sm danger" data-act="ureject" data-v="${u.id}">${L('拒绝','Reject')}</button>`:''}<button class="btn sm" data-act="uedit" data-v="${u.id}">${L('编辑','Edit')}</button>${u.id!==me.id?`<button class="btn sm danger" data-act="udel" data-v="${u.id}">${L('删除','Delete')}</button>`:''}</td></tr>`).join('')}</tbody></table></div>`;
+  <td class="act">${u.status==='pending'?`<button class="btn sm pri" data-act="uapprove" data-v="${u.id}">${L('批准','Approve')}</button><button class="btn sm danger" data-act="ureject" data-v="${u.id}">${L('拒绝','Reject')}</button>`:''}<button class="btn sm plain" data-act="wauser" data-v="${u.id}">WhatsApp</button><button class="btn sm" data-act="uedit" data-v="${u.id}">${L('编辑','Edit')}</button>${u.id!==me.id?`<button class="btn sm danger" data-act="udel" data-v="${u.id}">${L('删除','Delete')}</button>`:''}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function openModal(html){closeModal();const o=document.createElement('div');o.className='ov';o.id='ov';o.innerHTML=`<div class="md" role="dialog" aria-modal="true">${html}</div>`;
@@ -321,7 +321,7 @@ function caseModal(c){
   <fieldset id="phf"><legend id="phl"></legend><div id="phg" class="phg"></div><div id="phb" class="acts" style="justify-content:flex-start"></div>
    <input type="file" id="ph_cam" accept="image/*" capture="environment" hidden><input type="file" id="ph_gal" accept="image/*" multiple hidden></fieldset>
   <div class="err" id="c_err"></div>
-  <div class="acts">${isNew?'':`<button type="button" class="btn plain" data-act="exportone" style="margin-right:auto">${L('导出 PDF','Export PDF')}</button>`}<button type="button" class="btn plain" data-act="close">${eR||eW?L('取消','Cancel'):L('关闭','Close')}</button>${eR||eW?`<button class="btn pri" type="submit">${isNew?L('提交','Submit'):L('保存','Save')}</button>`:''}</div></form>`);
+  <div class="acts">${isNew?'':`<button type="button" class="btn plain" data-act="exportone">${L('导出 PDF','Export PDF')}</button><button type="button" class="btn plain" data-act="washare">${L('WhatsApp 分享','WhatsApp share')}</button><button type="button" class="btn plain" data-act="wadriver" style="margin-right:auto" ${waNum(c.driverPhone)?'':'disabled'}>${L('WhatsApp 司机','WhatsApp driver')}</button>`}<button type="button" class="btn plain" data-act="close">${eR||eW?L('取消','Cancel'):L('关闭','Close')}</button>${eR||eW?`<button class="btn pri" type="submit">${isNew?L('提交','Submit'):L('保存','Save')}</button>`:''}</div></form>`);
   SG={caseId:c.id||null,mech:!isNew&&eW,cust:!isNew&&(eR||eW)};renderPhotos();renderSigs();loadPhotoUrls([...PH.paths,...Object.values(c.sigs||{}).map(x=>x.path)]).then(()=>{renderPhotos();renderSigs()});
   const vi=$('#c_veh'),vl=$('#vlist');
   const showList=filter=>{const q=filter.trim().toUpperCase();const m=VEH.filter(x=>!q||x[0].toUpperCase().includes(q)||(x[6]||'').toUpperCase().includes(q)||x[2].toUpperCase().includes(q));
@@ -334,6 +334,24 @@ function caseModal(c){
 function fillVeh(){const v=VMAP[$('#c_veh').value.trim().toUpperCase()]||[];
   const set=(id,x)=>{$(id).textContent=x||'—'};set('#r_lm',v[6]);set('#r_type',v[2]);set('#r_org',v[1]);set('#r_make',v[3]);set('#r_model',v[4]);set('#r_ch',v[5])}
 
+const APP_URL='https://mechanic-board.vercel.app';
+const waNum=p=>{let d=String(p||'').replace(/[^0-9]/g,'');if(!d)return'';if(d.length===8)d='65'+d;return d};
+function waOpen(num,text){window.open('https://wa.me/'+num+'?text='+encodeURIComponent(text),'_blank','noopener')}
+function caseSummary(c){
+  const nm=uName(c.claimedById,c.claimedByName);
+  return [L('【维修工作单】','[Repair job] ')+c.caseNo,
+    L('状态：','Status: ')+sname(c.status),
+    L('车牌：','Vehicle: ')+(c.vehicleNo||'—')+(c.subType?' ('+c.subType+')':''),
+    L('地点：','Location: ')+(c.location||'—'),
+    L('司机：','Driver: ')+(c.driverName||'—')+(c.driverPhone?' '+c.driverPhone:''),
+    L('问题：','Problem: ')+(c.issue||'—'),
+    L('领取人：','Claimed by: ')+(nm||'—'),
+    c.fault?L('故障原因：','Fault cause: ')+c.fault:'',
+    APP_URL].filter(Boolean).join('\n')}
+function driverMsg(c){
+  return L('你好 '+(c.driverName||''),'Hi '+(c.driverName||''))+'，\n'+
+    L('关于车辆 '+c.vehicleNo+' 的维修（工作单 '+c.caseNo+'），目前状态：'+sname(c.status)+'。'+(c.claimedById?'负责维修员：'+uName(c.claimedById,c.claimedByName)+'。':''),
+      'about the repair of vehicle '+c.vehicleNo+' (job '+c.caseNo+'): status is '+sname(c.status)+'.'+(c.claimedById?' Mechanic: '+uName(c.claimedById,c.claimedByName)+'.':''))}
 let SG={caseId:null,mech:false,cust:false};
 const sigTxt=(c,k)=>{const x=(c.sigs||{})[k];return x?fD(x.at)+' '+fT(x.at)+' · '+x.name:''};
 function workHrs(c){if(!(c.wsD&&c.wsT&&c.weD&&c.weT))return'';const h=(new Date(c.weD+'T'+c.weT)-new Date(c.wsD+'T'+c.wsT))/36e5;return h>=0?h.toFixed(1):''}
@@ -579,6 +597,9 @@ document.addEventListener('click',e=>{
   else if(a==='claim')claim(v);
   else if(a==='del'){const c=cases.find(x=>x.id===v);confirmBox(L('删除工作 ','Delete job ')+esc(c.caseNo)+'?',async()=>{const r=await sb.from('cases').delete().eq('id',v).select();if(r.error||!r.data.length)throw r.error||new Error('denied');refreshData()})}
   else if(a==='close')closeModal();
+  else if(a==='washare'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen('',caseSummary(c))}
+  else if(a==='wadriver'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen(waNum(c.driverPhone),driverMsg(c))}
+  else if(a==='wauser'){const u=uById(v);u&&waOpen(waNum(u.phone),L('你好 '+u.name+'，你的账号'+(u.status==='approved'?'已批准，可以登录了：':'的状态已更新。请登录查看：'),'Hi '+u.name+', your account '+(u.status==='approved'?'is approved. You can log in here: ':'status has been updated. Log in to check: '))+APP_URL)}
   else if(a==='exportone'){const c=cases.find(x=>x.id===SG.caseId);c&&exportPDF([c])}
   else if(a==='exportall')exportPDF(filtered());
   else if(a==='sign')sigPad(v);
