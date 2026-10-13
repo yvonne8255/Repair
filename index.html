@@ -7,7 +7,7 @@
   --maroon:#7A0C1C; --footer:#6A0303; --red:#990000; --title:#990000; --signal:#C41E2D; --alert:#DC0E20; --navy:#1E2F4E; --good:#007A38;
   --brand:#7A0C1C; --focus:#1E2F4E;
   --demo:#E8710A; --switch:#5B7083; --out:#C41E2D;
-  --r-admin:#7B3FC4; --r-supervisor:#0E7C86; --r-mechanic:#1E8A4C; --r-operation:#1F6FD1;
+  --r-admin:#7B3FC4; --r-supervisor:#0E7C86; --r-mechanic:#1E8A4C; --r-operation:#1F6FD1; --r-management:#B45309; --r-department_head:#BE185D;
   --tl:92%; --tt:26%;
   --mono:'Roboto',system-ui,sans-serif;
   --sans:'Roboto','PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
@@ -42,7 +42,7 @@ button{cursor:pointer}
 .me{display:flex;gap:8px;align-items:center;background:transparent;border:0;color:#fff;padding:2px 4px}
 .me b{font-weight:700}
 .role{display:inline-block;border-radius:999px;padding:1px 10px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;white-space:nowrap}
-.role.supervisor{background:var(--r-supervisor)}.role.admin{background:var(--r-admin)}.role.mechanic{background:var(--r-mechanic)}.role.operation{background:var(--r-operation)}
+.role.supervisor{background:var(--r-supervisor)}.role.admin{background:var(--r-admin)}.role.mechanic{background:var(--r-mechanic)}.role.operation{background:var(--r-operation)}.role.management{background:var(--r-management)}.role.department_head{background:var(--r-department_head)}
 .tabs{display:flex;gap:6px;margin:16px 0 12px;flex-wrap:wrap}
 .tab{border:1.5px solid var(--red);background:var(--panel);color:var(--red);padding:7px 18px;border-radius:6px;font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
 .tab.on{background:var(--red);color:#fff}
@@ -131,8 +131,8 @@ const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);if(v===null
 let lang=ls('mech_lang')||'zh';
 const L=(zh,en)=>lang==='zh'?zh:en;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ROLES=['admin','supervisor','mechanic','operation'];
-const RN={admin:['管理员','Admin'],supervisor:['主管','Supervisor'],mechanic:['维修员','Mechanic'],operation:['运营','Operation']};
+const ROLES=['admin','supervisor','mechanic','operation','management','department_head'];
+const RN={admin:['管理员','Admin'],supervisor:['主管','Supervisor'],mechanic:['维修员','Mechanic'],operation:['运营','Operation'],management:['管理层','Management'],department_head:['部门主管','Department Head']};
 const rname=r=>RN[r]?RN[r][lang==='zh'?0:1]:r;
 const STS=['open','claimed','in_progress','waiting_parts','completed'];
 const SN={open:['待领取','Open'],claimed:['已分配','Assigned'],in_progress:['维修中','In progress'],waiting_parts:['等待零件','Waiting parts'],completed:['已完成','Completed']};
@@ -248,7 +248,7 @@ function authView(){
    ${reg?`<div class="f"><label for="a_name">${L('姓名','Name')} <i>*</i></label><input id="a_name" required></div>`:''}
    ${pk?'':`<div class="f"><label for="a_phone">${L('手机号码','Phone number')} <i>*</i></label><input id="a_phone" inputmode="tel" required></div>`}
    <div class="f"><label for="a_pw">${L('密码','Password')} <i>*</i></label><input id="a_pw" type="password" required minlength="6"></div>
-   ${reg?`<div class="f"><label for="a_role">${L('申请角色','Requested role')}</label><select id="a_role"><option value="mechanic">${rname('mechanic')}</option><option value="operation">${rname('operation')}</option><option value="supervisor">${rname('supervisor')}</option></select></div>`:''}
+   ${reg?`<div class="f"><label for="a_role">${L('申请角色','Requested role')}</label><select id="a_role"><option value="mechanic">${rname('mechanic')}</option><option value="operation">${rname('operation')}</option><option value="supervisor">${rname('supervisor')}</option><option value="management">${rname('management')}</option><option value="department_head">${rname('department_head')}</option></select></div>`:''}
    <div class="err" id="a_err">${esc(msg)}</div>
    <button class="btn pri" type="submit">${reg?L('提交注册','Submit'):L('登录','Log in')}</button>
   </form>
