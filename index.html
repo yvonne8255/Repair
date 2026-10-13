@@ -178,11 +178,22 @@ async function fn(action,payload){
   const r=await fetch(SB_URL+'/functions/v1/account',{method:'POST',headers:{'Content-Type':'application/json',apikey:SB_KEY,...(s?{Authorization:'Bearer '+s.access_token}:{})},body:JSON.stringify({action,...payload})});
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw Object.assign(new Error(j.error||'failed'),{code:j.error});return j}
+let listsTried=false;
+async function fetchAll(t,cols,ord){const o=[];for(let i=0;;i+=1000){const r=await sb.from(t).select(cols).order(ord).range(i,i+999);if(r.error)throw r.error;o.push(...r.data);if(r.data.length<1000)break}return o}
+async function refreshLists(){
+  try{await sb.functions.invoke('sync-lists',{body:{}})}catch(e){}
+  try{
+    const v=await fetchAll('vehicles','*','no');
+    if(v.length){VEH.length=0;v.forEach(x=>VEH.push([x.no,x.org,x.serial,x.subType,x.make,x.model,x.chassis,x.lm]));Object.keys(VMAP).forEach(k=>delete VMAP[k]);VEH.forEach(x=>VMAP[x[0].toUpperCase()]=x)}
+    const c=await fetchAll('customers','name','name');
+    if(c.length)customers=c.map(x=>x.name)
+  }catch(e){}
+}
 async function loadData(){
   if(!uid){users=[];cases=[];me=null;return}
   const a=await sb.from('profiles').select('*'),b=await sb.from('cases').select('*').order('createdAt',{ascending:false});
   if(a.error||b.error)throw new Error('load');
-  if(!customers.length){const cu=await sb.from('customers').select('name').order('name').limit(5000);if(!cu.error)customers=cu.data.map(x=>x.name)}
+  if(!listsTried){listsTried=true;refreshLists()}
   users=a.data;cases=b.data;me=users.find(u=>u.id===uid)||null;
   if(!me){await sb.auth.signOut();uid=null;users=[];cases=[]}
 }
