@@ -168,6 +168,7 @@ const toast=m=>{const t=document.createElement('div');t.className='toast';t.text
 
 function canEditReport(c){return isMgr()||c.claimedById===me.id||(c.createdById===me.id&&c.status==='open')}
 function canEditWork(c){return isMgr()||(!!c.claimedById&&c.claimedById===me.id)}
+function canAssign(c){return (eff()==='supervisor'||eff()==='admin')&&!c.claimedById}
 function canClaim(c){return (eff()==='mechanic'||eff()==='supervisor')&&!c.claimedById}
 
 const ERR={phone_taken:['该手机号码已被使用。','That phone number is already registered.'],invalid:['资料不正确（密码至少 6 位）。','Invalid details (password needs at least 6 characters).'],last_admin:['至少要保留一位已批准的管理员。','At least one approved admin must remain.'],forbidden:['没有权限。','Not allowed.'],unauthorized:['请重新登录。','Please log in again.']};
@@ -262,7 +263,7 @@ function boardView(){
   return `<div class="strip"><button class="tile ${!filt.status?'on':''}" style="--h:220" data-act="fstatus" data-v=""><span class="l">${L('全部','All')}</span><span class="n">${all.length}</span></button>
    ${STS.map(s=>`<button class="tile ${filt.status===s?'on':''}" style="--h:${SH[s]}" data-act="fstatus" data-v="${s}"><span class="l">${esc(sname(s))}</span><span class="n">${cnt(s)}</span></button>`).join('')}</div>
   <div class="bar"><input type="search" id="fq" placeholder="${L('搜索车牌 / 顾客 / 司机 / 地点…','Search vehicle / customer / driver / location…')}" value="${esc(filt.q)}">
-   <select id="ftype"><option value="">${L('全部维修地点','All repair locations')}</option>${types.map(t=>`<option value="${t||UN}" ${filt.type===(t||UN)?'selected':''}>${esc(rlname(t))}</option>`).join('')}</select>
+   <select id="ftype"><option value="">${L('全部维修组','All repair teams')}</option>${types.map(t=>`<option value="${t||UN}" ${filt.type===(t||UN)?'selected':''}>${esc(rlname(t))}</option>`).join('')}</select>
    <button class="btn plain" data-act="exportall">${L('导出全部 PDF','Export all as PDF')}</button>
    <label><input type="checkbox" id="fmine" ${filt.mine?'checked':''}> ${L('与我相关','Mine')}</label>
    ${canNew?`<button class="btn pri" data-act="new" style="margin-left:auto">+ ${L('报告车辆问题','Report a vehicle problem')}</button>`:''}</div>
@@ -271,15 +272,15 @@ function boardView(){
 }
 function tableFor(rows){
   const H=[L('操作','Actions'),L('工作编号','Case No.'),L('状态','Status'),L('报告日期','Report date'),L('报告时间','Report time'),L('开单人','Opened by'),L('车牌 Vehicle No.','Vehicle No.'),'LM / LP No.',L('机构','Organization'),L('设备序列号','Equipment Serial No.'),L('类型','Type'),L('品牌 Make','Make'),L('型号 Model','Model'),L('底盘 Chassis','Chassis'),L('顾客','Customer'),L('地点','Location'),L('司机','Driver'),L('司机电话','Driver phone'),L('问题描述','Problem'),L('照片','Photos'),
-   L('领取人','Claimed by'),L('领取日期','Claim date'),L('领取时间','Claim time'),L('更新人','Updated by'),L('更新日期','Update date'),L('更新时间','Update time'),L('GPS 位置','GPS location'),L('开工日期','Start date'),L('开工时间','Start time'),L('完工日期','End date'),L('完工时间','End time'),L('工时(小时)','Work hrs'),L('维修技师','Technician'),L('共计加班(小时)','Total OT (hrs)'),L('完成的工作描述','Description of Work Done'),L('使用的零件','Parts Used'),L('所需零件（采购用）','Parts Required (For Purchasing)'),L('维修员签名','Mechanic signature'),L('客户签名','Customer signature')];
+   L('指派给','Assigned to'),L('指派日期','Assigned date'),L('指派时间','Assigned time'),L('更新人','Updated by'),L('更新日期','Update date'),L('更新时间','Update time'),L('GPS 位置','GPS location'),L('工时(小时)','Work hrs'),L('维修技师','Technician'),L('共计加班(小时，下午5点后)','Total OT (hrs, after 5pm)'),L('完成的工作描述','Description of Work Done'),L('使用的零件','Parts Used'),L('所需零件（采购用）','Parts Required (For Purchasing)'),L('维修员签名','Mechanic signature'),L('客户签名','Customer signature')];
   const hrs=c=>{if(!(c.wsD&&c.wsT&&c.weD&&c.weT))return'';const h=(new Date(c.weD+'T'+c.weT)-new Date(c.wsD+'T'+c.wsT))/36e5;return h>=0?h.toFixed(1):''};
   const td=(v,cls='')=>v===''||v==null?`<td class="nil ${cls}">—</td>`:`<td class="${cls}">${esc(v)}</td>`;
   return `<div class="tw"><table><thead><tr>${H.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(c=>`<tr class="row" data-act="open" data-v="${c.id}">
-   <td class="act">${canClaim(c)?`<button class="btn sm pri" data-act="claim" data-v="${c.id}">${L('领取','Claim')}</button>`:''}${isAdmin()?`<button class="btn sm danger" data-act="del" data-v="${c.id}">${L('删除','Delete')}</button>`:''}</td>
+   <td class="act">${canClaim(c)?`<button class="btn sm pri" data-act="claim" data-v="${c.id}">${L('接单','Take')}</button>`:''}${canAssign(c)?`<button class="btn sm" data-act="assign" data-v="${c.id}">${L('指派','Assign')}</button>`:''}${isAdmin()?`<button class="btn sm danger" data-act="del" data-v="${c.id}">${L('删除','Delete')}</button>`:''}</td>
    ${td(c.caseNo,'mono')}<td>${sChip(c.status)}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}
    ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.serialNo,'mono')}<td>${c.subType?tyChip(c.subType):'<span style="color:var(--mute)">—</span>'}</td>${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}${td((c.photos||[]).length?String(c.photos.length):'')}
    ${td(uLabel(c.claimedById,c.claimedByName))}${td(fD(c.claimedAt))}${td(fT(c.claimedAt))}${td(uLabel(c.updatedById,c.updatedByName))}${td(fD(c.updatedAt))}${td(fT(c.updatedAt))}${lastGps(c)?`<td><a href="${mapUrl(lastGps(c))}" target="_blank" rel="noopener" style="color:var(--title)">${esc(gpsTxt(lastGps(c)))}</a></td>`:'<td class="nil">—</td>'}
-   ${td(c.wsD)}${td(c.wsT)}${td(c.weD)}${td(c.weT)}${td(hrs(c))}${td(c.tech)}${td(c.ot)}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}</tr>`).join('')}</tbody></table></div>`;
+   ${td(workHrs(c))}${td(c.tech)}${td(otHrs(c))}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}</tr>`).join('')}</tbody></table></div>`;
 }
 function usersView(){
   const rows=[...users].sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)||(b.createdAt||'').localeCompare(a.createdAt||''));
@@ -305,14 +306,14 @@ function caseModal(c){
   modal={id:c.id||null};
   PH={paths:[...(c.photos||[])],urls:{},queue:[],caseId:c.id||null,canEdit:isNew||eR||eW,busy:false};
   openModal(`<h3>${isNew?L('报告车辆问题','Report a vehicle problem'):`<span class="mono">${esc(c.caseNo)}</span> ${sChip(c.status)} ${rlChip(c.repairLocation)} ${tyChip(c.subType)}`}</h3>
-  ${isNew?'':`<p class="meta"><span>${L('开单','Opened by')}: <b>${esc(uLabel(c.createdById,c.createdByName))}</b> ${fD(c.createdAt)} ${fT(c.createdAt)}</span><span>${L('领取','Claimed by')}: <b>${c.claimedById?esc(uLabel(c.claimedById,c.claimedByName)):'—'}</b> ${fD(c.claimedAt)} ${fT(c.claimedAt)}</span>${c.updatedAt?`<span>${L('最后更新','Last update')}: <b>${esc(uLabel(c.updatedById,c.updatedByName))}</b> ${fD(c.updatedAt)} ${fT(c.updatedAt)}</span>`:''}</p>
+  ${isNew?'':`<p class="meta"><span>${L('开单','Opened by')}: <b>${esc(uLabel(c.createdById,c.createdByName))}</b> ${fD(c.createdAt)} ${fT(c.createdAt)}</span><span>${L('指派给','Assigned to')}: <b>${c.claimedById?esc(uLabel(c.claimedById,c.claimedByName)):'—'}</b> ${fD(c.claimedAt)} ${fT(c.claimedAt)}</span>${c.updatedAt?`<span>${L('最后更新','Last update')}: <b>${esc(uLabel(c.updatedById,c.updatedByName))}</b> ${fD(c.updatedAt)} ${fT(c.updatedAt)}</span>`:''}</p>
   ${(c.log||[]).length?`<div class="meta" style="flex-direction:column;gap:3px"><b>${L('状态记录','Status history')}</b>${histRows(c).reverse().map(x=>`<span><b>${esc(sname(x.status))}</b> · ${L('开始','Start')} ${fD(x.start)} ${fT(x.start)} · ${L('结束','End')} ${x.end?fD(x.end)+' '+fT(x.end):'—'} · ${esc(uName(x.by,x.byName))}${x.gps?` · <a href="${mapUrl(x.gps)}" target="_blank" rel="noopener" style="color:var(--title)">GPS ${esc(gpsTxt(x.gps))}</a>`:''}</span>`).join('')}</div>`:''}`}
   ${!isNew&&!eR&&!eW?`<p class="meta">${L('只读：只有开单人（未被领取时）、领取工作的维修员和管理员可以更改。','Read only: only the opener (before it is claimed), the mechanic who claimed it, and admins can change this.')}</p>`:''}
   <form id="cf">
   <fieldset><legend>${L('车辆与报告','Vehicle & report')}</legend><div class="g">
    <div class="f"><label for="c_veh">${L('车牌 Vehicle No.','Vehicle No.')} <i>*</i></label><div style="position:relative"><input id="c_veh" value="${esc(c.vehicleNo||'')}" autocomplete="off" placeholder="${L('点击选择或输入车牌','Click to choose or type')}" ${eR?'':'disabled'}><div id="vlist" class="vlist" hidden></div></div></div>
    ${ro('LM / LP No.',v[7]||c.lmNo,'r_lm')}${ro(L('机构 Organization','Organization'),v[1]||c.org,'r_org')}${ro(L('设备序列号 Equipment Serial No.','Equipment Serial No.'),v[2]||c.serialNo,'r_sn')}${ro(L('类型 Vehicle Sub Type','Vehicle Sub Type'),v[3]||c.subType,'r_type')}${ro(L('品牌 Make','Make'),v[4]||c.make,'r_make')}${ro(L('型号 Model','Model'),v[5]||c.model,'r_model')}${ro(L('底盘 Chassis','Chassis'),v[6]||c.chassis,'r_ch')}
-   <div class="f"><label for="c_rl">${L('维修地点 Repair Location','Repair Location')} <i>*</i></label><select id="c_rl" ${eR?'':'disabled'}><option value="">—</option>${RLS.map(r=>`<option value="${r}" ${c.repairLocation===r?'selected':''}>${esc(rlname(r))}</option>`).join('')}</select></div>
+   <div class="f"><label for="c_rl">${L('维修组 Repair Team','Repair Team')} <i>*</i></label><select id="c_rl" ${eR?'':'disabled'}><option value="">—</option>${RLS.map(r=>`<option value="${r}" ${c.repairLocation===r?'selected':''}>${esc(rlname(r))}</option>`).join('')}</select></div>
    <div class="f"><label for="c_cus">${L('顾客（可选，可自由填写）','Customer (optional, free text)')}</label><input id="c_cus" list="cl" value="${esc(c.customer||'')}" autocomplete="off" ${eR?'':'disabled'}><datalist id="cl">${customers.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
    ${fld('c_loc',L('地点','Location'),c.location||'',{req:1,dis:!eR})}
    ${fld('c_dn',L('司机名字','Driver name'),c.driverName||'',{req:1,dis:!eR})}
@@ -321,14 +322,12 @@ function caseModal(c){
   </div></fieldset>
   ${isNew?'':`<fieldset><legend>${L('维修记录','Repair record')}</legend><div class="g">
    <div class="f"><label for="c_st">${L('工作状态','Work status')}</label><select id="c_st" ${eW?'':'disabled'}>${STS.map(s=>`<option value="${s}" ${c.status===s?'selected':''}>${esc(sname(s))}</option>`).join('')}</select></div>
-   ${isMgr()?`<div class="f"><label for="c_cb">${L('领取人（仅管理员可改）','Claimed by (admin only)')}</label><select id="c_cb"><option value="">—</option>${mech.map(u=>`<option value="${u.id}" ${c.claimedById===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div>`:''}
+   ${isMgr()?`<div class="f"><label for="c_cb">${L('指派给（仅管理员可改）','Assigned to (admin only)')}</label><select id="c_cb"><option value="">—</option>${mech.map(u=>`<option value="${u.id}" ${c.claimedById===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div>`:''}
    ${fld('c_te',L('维修技师','Technician'),c.tech||'',{dis:!eW})}
    ${fld('c_wd',L('完成的工作描述 Description of Work Done','Description of Work Done'),c.workDone||'',{type:'textarea',w:1,dis:!eW})}
    ${fld('c_pu',L('使用的零件 Parts Used','Parts Used'),c.partsUsed||'',{type:'textarea',w:1,dis:!eW})}
    ${fld('c_pr',L('所需零件（采购用）Parts Required (For Purchasing)','Parts Required (For Purchasing)'),c.partsRequired||'',{type:'textarea',w:1,dis:!eW})}
-   ${fld('c_sd',L('开工日期','Start date'),c.wsD||'',{type:'date',dis:!eW})}${fld('c_stt',L('开工时间','Start time'),c.wsT||'',{type:'time',dis:!eW})}
-   ${fld('c_ed',L('完工日期','End date'),c.weD||'',{type:'date',dis:!eW})}${fld('c_et',L('完工时间','End time'),c.weT||'',{type:'time',dis:!eW})}
-   ${fld('c_ot',L('共计加班（小时）','Total overtime (hrs)'),c.ot??'',{type:'number',dis:!eW,attrs:'min="0" step="0.5"'})}
+   ${fld('c_wh',L('工时（小时，自动）','Work hrs (auto)'),workHrs(c),{dis:true})}${fld('c_ot',L('共计加班（小时，下午5点后自动计算）','Total overtime (hrs, auto, after 5pm)'),otHrs(c),{dis:true})}
   </div></fieldset>`}
   ${isNew?'':`<fieldset><legend>${L('签名','Signatures')}</legend><div class="g" id="sgg"></div></fieldset>`}
   <fieldset id="phf"><legend id="phl"></legend><div id="phg" class="phg"></div><div id="phb" class="acts" style="justify-content:flex-start"></div>
@@ -350,9 +349,11 @@ function fillVeh(){const v=VMAP[$('#c_veh').value.trim().toUpperCase()]||[];
 
 function getGps(){return new Promise(res=>{
   if(!navigator.geolocation)return res(null);
-  navigator.geolocation.getCurrentPosition(p=>res({lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy)}),()=>res(null),{enableHighAccuracy:true,timeout:8000,maximumAge:30000})})}
+  navigator.geolocation.getCurrentPosition(async p=>{const g={lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy)};
+    try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),5000);const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=en&lat='+g.lat+'&lon='+g.lng,{signal:ac.signal});clearTimeout(tm);const j=await r.json();if(j&&j.display_name)g.addr=j.display_name}catch(e){}
+    res(g)},()=>res(null),{enableHighAccuracy:true,timeout:8000,maximumAge:30000})})}
 const mapUrl=g=>'https://www.google.com/maps?q='+g.lat+','+g.lng;
-const gpsTxt=g=>g?g.lat+', '+g.lng:'';
+const gpsTxt=g=>g?(g.addr||g.lat+', '+g.lng):'';
 function lastGps(c){const l=[...(c.log||[])].reverse().find(x=>x.gps);return l?l.gps:null}
 function histRows(c){const l=[...(c.log||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
   return l.map((x,i)=>({status:x.to,start:x.at,end:l[i+1]?l[i+1].at:'',by:x.by,byName:x.byName,gps:x.gps}))}
@@ -368,9 +369,9 @@ function caseSummary(c){
     L('地点：','Location: ')+(c.location||'—'),
     L('司机：','Driver: ')+(c.driverName||'—')+(c.driverPhone?' '+c.driverPhone:''),
     L('问题：','Problem: ')+(c.issue||'—'),
-    L('领取人：','Claimed by: ')+(nm||'—'),
+    L('指派给：','Assigned to: ')+(nm||'—'),
     c.workDone?L('完成的工作：','Work done: ')+c.workDone:'',
-    lastGps(c)?'GPS: '+mapUrl(lastGps(c)):'',
+    lastGps(c)?'GPS: '+gpsTxt(lastGps(c))+' '+mapUrl(lastGps(c)):'',
     APP_URL].filter(Boolean).join('\n')}
 function driverMsg(c){
   return L('你好 '+(c.driverName||''),'Hi '+(c.driverName||''))+'，\n'+
@@ -378,7 +379,9 @@ function driverMsg(c){
       'about the repair of vehicle '+c.vehicleNo+' (job '+c.caseNo+'): status is '+sname(c.status)+'.'+(c.claimedById?' Mechanic: '+uName(c.claimedById,c.claimedByName)+'.':''))}
 let SG={caseId:null,mech:false,cust:false};
 const sigTxt=(c,k)=>{const x=(c.sigs||{})[k];return x?fD(x.at)+' '+fT(x.at)+' · '+x.name:''};
-function workHrs(c){if(!(c.wsD&&c.wsT&&c.weD&&c.weT))return'';const h=(new Date(c.weD+'T'+c.weT)-new Date(c.wsD+'T'+c.wsT))/36e5;return h>=0?h.toFixed(1):''}
+function workSpan(c){const l=[...(c.log||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));const st=l.find(x=>x.to==='in_progress');if(!st)return null;const en=[...l].reverse().find(x=>x.to==='completed'&&x.at>st.at);const a=new Date(st.at),b=en?new Date(en.at):(c.status==='completed'?null:new Date());return b&&b>a?[a,b]:null}
+function workHrs(c){const w=workSpan(c);return w?((w[1]-w[0])/36e5).toFixed(1):''}
+function otHrs(c){const w=workSpan(c);if(!w)return'';let t=0;const d=new Date(w[0]);d.setHours(0,0,0,0);for(;d<w[1];d.setDate(d.getDate()+1)){const a=new Date(d);a.setHours(17,0,0,0);const z=new Date(d);z.setDate(z.getDate()+1);z.setHours(0,0,0,0);const x=Math.max(a,w[0]),y=Math.min(z,w[1]);if(y>x)t+=(y-x)/36e5}return t.toFixed(1)}
 function renderSigs(){
   const g=$('#sgg');if(!g)return;const c=cases.find(x=>x.id===SG.caseId)||{};const sg=c.sigs||{};
   const keep=$('#sg_cname')?$('#sg_cname').value:null;
@@ -430,21 +433,17 @@ async function exportPDF(list){
     try{await d.fonts.ready}catch(e){}
     const pdf=new window.jspdf.jsPDF({unit:'pt',format:'a4'}),W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
     let first=true;
-    for(const sec of d.querySelectorAll('section.pg')){
-      const cv=await html2canvas(sec,{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794});
-      const pxPerPage=Math.floor(H*cv.width/W);
-      const sr=sec.getBoundingClientRect(),k=cv.width/sr.width,units=[];let cur=null;
-      [...sec.children].forEach(el=>{const r=el.getBoundingClientRect(),t=(r.top-sr.top)*k,b=(r.bottom-sr.top)*k;if(el.tagName==='H2'||!cur){cur={t,b};units.push(cur)}else cur.b=b});
-      const starts=[0];units.forEach(u=>{const st=starts[starts.length-1];if(u.b-st>pxPerPage&&u.t>st+1)starts.push(u.t)});
-      for(let si=0;si<starts.length;si++){
-        const end=si+1<starts.length?starts[si+1]:cv.height;
-        for(let y=Math.round(starts[si]);y<end-2;y+=pxPerPage){
-          const h=Math.min(pxPerPage,Math.round(end)-y),t=document.createElement('canvas');t.width=cv.width;t.height=h;
-          t.getContext('2d').drawImage(cv,0,y,cv.width,h,0,0,cv.width,h);
-          if(!first)pdf.addPage();first=false;
-          pdf.addImage(t.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,h*W/cv.width);
-        }
-      }
+    const LIM=1123-10-18;
+    for(const sec of [...d.querySelectorAll('section.pg')]){
+      const units=[];let cur=null;
+      [...sec.children].forEach(el=>{if(el.tagName==='H2'||!cur){cur=d.createElement('div');units.push(cur)}cur.append(el)});
+      let page=sec;
+      units.forEach(u=>{page.append(u);const pr=page.getBoundingClientRect();if(u.getBoundingClientRect().bottom-pr.top>LIM&&page.children.length>1){const np=d.createElement('section');np.className='pg';page.after(np);np.append(u);page=np}});
+    }
+    for(const pg of d.querySelectorAll('section.pg')){
+      const cv=await html2canvas(pg,{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:794});
+      if(!first)pdf.addPage();first=false;
+      pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,W,H);
     }
     const name=(list.length===1?list[0].caseNo:'Mechanic-jobs-'+fD(new Date().toISOString()))+'.pdf';
     pdfDialog(pdf.output('blob'),name,list.length);
@@ -474,20 +473,19 @@ function reportHtml(list,urls){
   const dt=iso=>iso?fD(iso)+' '+fT(iso):'';
   const pages=list.map(c=>{
     const nm=(id,fb)=>uName(id,fb);
-    const hist=histRows(c).map(x=>`<li><b>${esc(sname(x.status))}</b> · ${esc(L('开始','Start'))} ${dt(x.start)} · ${esc(L('结束','End'))} ${x.end?dt(x.end):'—'} · ${esc(nm(x.by,x.byName))}${x.gps?' · GPS '+esc(gpsTxt(x.gps)):''}</li>`).join('');
+    const hist0=histRows(c).map(x=>`<li><b>${esc(sname(x.status))}</b> · ${esc(L('开始','Start'))} ${dt(x.start)} · ${esc(L('结束','End'))} ${x.end?dt(x.end):'—'} · ${esc(nm(x.by,x.byName))}${x.gps?' · GPS '+esc(gpsTxt(x.gps)):''}</li>`).join('');
     const ph=(c.photos||[]).map(p=>urls[p]?`<img src="${esc(urls[p])}" alt="" crossorigin="anonymous">`:'').join('');
     const sg=k=>{const x=(c.sigs||{})[k];return `<div class="sgb"><div class="sgi">${x&&urls[x.path]?`<img src="${esc(urls[x.path])}" alt="" crossorigin="anonymous">`:''}${k==='mechanic'?`<img class="stampp" src="${STAMP}" alt="">`:''}</div><div class="sgl">${k==='mechanic'?esc(L('维修员签名','Mechanic signature')):esc(L('客户 / 司机签名','Customer / driver signature'))}</div><div class="sgn">${x?esc(x.name)+' · '+dt(x.at):'—'}</div></div>`};
     return `<section class="pg"><header><div><span class="br">POLLISUM</span><h1>${esc(L('维修工作单','Repair job card'))}</h1></div><div class="cn">${esc(c.caseNo)}<br><span>${esc(sname(c.status))}</span></div></header>
-    <h2>${esc(L('车辆','Vehicle'))}</h2>${kv([['Vehicle No.',c.vehicleNo],['LM / LP No.',c.lmNo],[L('机构','Organization'),c.org],[L('设备序列号','Equipment Serial No.'),c.serialNo],[L('类型','Vehicle Sub Type'),c.subType],[L('品牌','Make'),c.make],[L('型号','Model'),c.model],[L('底盘','Chassis'),c.chassis],[L('维修地点','Repair Location'),rlname(c.repairLocation)],[L('顾客','Customer'),c.customer]])}
+    <h2>${esc(L('车辆','Vehicle'))}</h2>${kv([['Vehicle No.',c.vehicleNo],['LM / LP No.',c.lmNo],[L('机构','Organization'),c.org],[L('设备序列号','Equipment Serial No.'),c.serialNo],[L('类型','Vehicle Sub Type'),c.subType],[L('品牌','Make'),c.make],[L('型号','Model'),c.model],[L('底盘','Chassis'),c.chassis],[L('维修组','Repair Team'),rlname(c.repairLocation)],[L('顾客','Customer'),c.customer]])}
     <h2>${esc(L('报告','Report'))}</h2>${kv([[L('开单人','Opened by'),uName(c.createdById,c.createdByName)],[L('报告日期时间','Reported'),dt(c.createdAt)],[L('地点','Location'),c.location],[L('司机','Driver'),c.driverName],[L('司机电话','Driver phone'),c.driverPhone]])}${full(L('问题描述','Problem'),c.issue)}
-    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('开工日期时间','Start'),[c.wsD,c.wsT].filter(Boolean).join(' ')],[L('完工日期时间','End'),[c.weD,c.weT].filter(Boolean).join(' ')],[L('工时(小时)','Work hrs'),workHrs(c)],[L('共计加班(小时)','Total OT (hrs)'),c.ot]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
-    ${hist?`<h2>${esc(L('状态记录','Status history'))}</h2><ul class="hl">${hist}</ul>`:''}
+    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('工时(小时)','Work hrs'),workHrs(c)],[L('共计加班(小时，下午5点后)','Total OT (hrs, after 5pm)'),otHrs(c)]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
     ${ph?`<h2>${esc(L('照片','Photos'))} (${(c.photos||[]).length})</h2><div class="pgrid">${ph}</div>`:''}
     <h2>${esc(L('签名','Signatures'))}</h2><div class="sgrow">${sg('mechanic')}${sg('customer')}</div></section>`}).join('');
   return `<!doctype html><html lang="${lang==='zh'?'zh':'en'}"><head><meta charset="utf-8"><title>${list.length===1?esc(list[0].caseNo):'Mechanic-jobs-'+fD(new Date().toISOString())}</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&display=swap">
   <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;font:13.33px/1.4 Calibri,Carlito,'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;color:#191D24;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pg{width:794px;padding:28px 32px 18px;border-bottom:10px solid #6A0303}.pg:last-child{page-break-after:auto}
+  .pg{width:794px;height:1123px;overflow:hidden;box-sizing:border-box;padding:28px 32px 18px;border-bottom:10px solid #6A0303}.pg:last-child{page-break-after:auto}
   header{display:flex;justify-content:space-between;align-items:center;background:#7A0C1C;color:#fff;padding:10px 14px;border-radius:6px}
   .br{font-size:13.33px;font-weight:700;letter-spacing:.2em;opacity:.85}h1{margin:0;font-size:20px;font-weight:900;text-transform:uppercase}.cn{text-align:right;font-weight:700;font-size:14px}.cn span{font-size:13.33px;font-weight:500}
   h2{margin:12px 0 4px;font-size:13.33px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#990000}
@@ -540,20 +538,20 @@ async function saveCase(e){
   const v=VMAP[(g('#c_veh')||'').toUpperCase()];
   if(editR){
     if(!v){err.textContent=L('请从车辆列表选择有效的车牌。','Choose a valid vehicle number from the list.');return}
-    if(!g('#c_rl')){err.textContent=L('请选择维修地点。','Choose a repair location.');return}
+    if(!g('#c_rl')){err.textContent=L('请选择维修组。','Choose a repair team.');return}
     if(!g('#c_loc')||!g('#c_dn')||!g('#c_dp')||!g('#c_is')){err.textContent=L('请填写所有必填项（*）。','Fill in all required fields (*).');return}}
   const now=new Date().toISOString();let d={};let notifyInfo=null;
   if(editR)Object.assign(d,{vehicleNo:v[0],org:v[1],serialNo:v[2],subType:v[3],make:v[4],model:v[5],chassis:v[6],lmNo:v[7],repairLocation:g('#c_rl'),customer:g('#c_cus'),location:g('#c_loc'),driverName:g('#c_dn'),driverPhone:g('#c_dp'),issue:g('#c_is')});
   try{
     if(isNew){
-      const dt=new Date(),no='C'+String(dt.getFullYear()).slice(2)+p2(dt.getMonth()+1)+p2(dt.getDate())+'-'+rnd().slice(0,4).toUpperCase();
+      const nr=await sb.rpc('next_case_no');if(nr.error||!nr.data)throw nr.error||new Error('case no');const no=nr.data;
       const gps=await gpsP;gpsP=null;if(!gps)throw new Error(L('必须获取 GPS 位置，请允许浏览器定位后重试','GPS location is required. Allow location access and try again.'));
       const nid=crypto.randomUUID(),paths=[];
       for(const q of PH.queue)paths.push(await uploadPhoto(nid,q.blob));
       const ins=await sb.from('cases').insert({...d,id:nid,photos:paths,caseNo:no,status:'open',log:[{at:now,by:me.id,byName:me.name,from:'',to:'open',...(gps?{gps}:{})}],createdAt:now,createdById:me.id,createdByName:me.name,claimedById:'',claimedByName:'',claimedAt:''});
       if(ins.error)throw ins.error;
     }else{
-      if(canEditWork(c)){const o=g('#c_ot');Object.assign(d,{status:g('#c_st'),tech:g('#c_te'),workDone:g('#c_wd'),partsUsed:g('#c_pu'),partsRequired:g('#c_pr'),wsD:g('#c_sd'),wsT:g('#c_stt'),weD:g('#c_ed'),weT:g('#c_et'),ot:o===''?'':String(Number(o))})}
+      if(canEditWork(c)){Object.assign(d,{status:g('#c_st'),tech:g('#c_te'),workDone:g('#c_wd'),partsUsed:g('#c_pu'),partsRequired:g('#c_pr')})}
       if(isMgr()&&$('#c_cb')){const id=$('#c_cb').value;if(id!==(c.claimedById||'')){d.claimedById=id;d.claimedByName=uName(id);d.claimedAt=id?now:'';if(id&&c.status==='open'&&(!d.status||d.status==='open'))d.status='claimed';if(!id&&c.status!=='completed')d.status='open'}}
       Object.assign(d,{updatedAt:now,updatedById:me.id,updatedByName:me.name});
       let gps=null;const changed=d.status&&d.status!==c.status;
@@ -565,21 +563,38 @@ async function saveCase(e){
       if(changed)notifyInfo={...c,...d,status:d.status,gps};
     }
     PH.queue.forEach(q=>URL.revokeObjectURL(q.url));closeModal();toast(L('已保存','Saved'));refreshData();
-    if(!isNew&&notifyInfo)askNotify(notifyInfo);
+    if(!isNew&&notifyInfo)notifyAfter(notifyInfo);
   }catch(x){err.textContent=L('保存失败：','Save failed: ')+(x.message||x.code||'')}
 }
 async function claim(id){
   const c=cases.find(x=>x.id===id);if(!c||!canClaim(c))return;
   toast(L('正在获取 GPS 位置…','Getting GPS location…'));const gps=await getGps();const now=new Date().toISOString();
   if(!gps){toast(L('必须获取 GPS 位置，请允许浏览器定位后重试','GPS location is required. Allow location access and try again.'));return}
-  try{const up=await sb.from('cases').update({claimedById:me.id,claimedByName:me.name,claimedAt:now,status:'claimed',tech:me.name,updatedAt:now,updatedById:me.id,updatedByName:me.name,log:[...(c.log||[]),{at:now,by:me.id,byName:me.name,from:c.status,to:'claimed',...(gps?{gps}:{})}]}).eq('id',id).eq('claimedById','').select();if(up.error||!up.data.length)throw up.error||new Error('taken');toast(L('已分配给你','Assigned to you'));askNotify({...c,...up.data[0],gps})}catch(x){toast(L('领取失败，可能已被他人领取','Claim failed, it may already be taken'))}refreshData()
+  try{const up=await sb.from('cases').update({claimedById:me.id,claimedByName:me.name,claimedAt:now,status:'claimed',tech:me.name,updatedAt:now,updatedById:me.id,updatedByName:me.name,log:[...(c.log||[]),{at:now,by:me.id,byName:me.name,from:c.status,to:'claimed',...(gps?{gps}:{})}]}).eq('id',id).eq('claimedById','').select();if(up.error||!up.data.length)throw up.error||new Error('taken');toast(L('已分配给你','Assigned to you'));notifyAfter({...c,...up.data[0],gps})}catch(x){toast(L('领取失败，可能已被他人领取','Claim failed, it may already be taken'))}refreshData()
 }
+async function notifyAfter(c){
+  try{const r=await sb.functions.invoke('notify',{body:{caseId:c.id}});if(r.data&&r.data.configured){toast(L('已自动发送 WhatsApp','WhatsApp sent automatically'));return}}catch(e){}
+  askNotify(c)}
 function askNotify(c){
-  const cr=uById(c.createdById);if(!cr||cr.id===me.id||!waNum(cr.phone))return;
-  const msg=L('你好 '+cr.name+'，你开的工作单 '+c.caseNo+'（'+(c.vehicleNo||'')+'）状态已更新为「'+sname(c.status)+'」，更新人：'+me.name+'。','Hi '+cr.name+', job '+c.caseNo+' ('+(c.vehicleNo||'')+') you opened is now "'+sname(c.status)+'". Updated by '+me.name+'.')+(c.gps?' GPS: '+mapUrl(c.gps):'')+'\n'+APP_URL;
+  const cr=uById(c.createdById),rc=[];
+  if(cr&&cr.id!==me.id&&waNum(cr.phone))rc.push({k:L('开单人','Opener'),name:cr.name,phone:cr.phone,msg:L('你好 '+cr.name+'，你开的工作单 '+c.caseNo+'（'+(c.vehicleNo||'')+'）状态已更新为「'+sname(c.status)+'」，更新人：'+me.name+'。','Hi '+cr.name+', job '+c.caseNo+' ('+(c.vehicleNo||'')+') you opened is now "'+sname(c.status)+'". Updated by '+me.name+'.')+(c.gps?' '+gpsTxt(c.gps)+' '+mapUrl(c.gps):'')+'\n'+APP_URL});
+  if(waNum(c.driverPhone))rc.push({k:L('司机','Driver'),name:c.driverName||'',phone:c.driverPhone,msg:driverMsg(c)+(c.gps?'\n'+gpsTxt(c.gps)+' '+mapUrl(c.gps):'')});
+  if(!rc.length)return;
   const o=document.createElement('div');o.className='sgo';
-  o.innerHTML=`<div class="md" style="max-width:440px"><h3>${L('通知开单人','Notify the opener')}</h3><p>${L('状态已更新为','Status is now')} ${sChip(c.status)}</p><p class="meta"><span>${esc(cr.name)} · ${esc(cr.phone)}</span></p><div class="acts"><button type="button" class="btn plain" id="nf_x">${L('跳过','Skip')}</button><button type="button" class="btn pri" id="nf_go">${L('WhatsApp 通知','Send WhatsApp')}</button></div></div>`;
-  document.body.append(o);o.querySelector('#nf_x').onclick=()=>o.remove();o.querySelector('#nf_go').onclick=()=>{waOpen(waNum(cr.phone),msg);o.remove()}}
+  o.innerHTML=`<div class="md" style="max-width:440px"><h3>${L('WhatsApp 通知','WhatsApp notify')}</h3><p>${L('状态已更新为','Status is now')} ${sChip(c.status)}</p>${rc.map((r,i)=>`<p class="meta"><span>${esc(r.k)}: ${esc(r.name)} · ${esc(r.phone)}</span></p><div class="acts" style="justify-content:flex-start"><button type="button" class="btn pri" data-i="${i}">${L('WhatsApp 发送给','Send to')} ${esc(r.k)}</button></div>`).join('')}<div class="acts"><button type="button" class="btn plain" id="nf_x">${L('关闭','Close')}</button></div></div>`;
+  document.body.append(o);o.querySelector('#nf_x').onclick=()=>o.remove();o.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const r=rc[+b.dataset.i];waOpen(waNum(r.phone),r.msg);b.disabled=true})}
+function assignDialog(id){
+  const c=cases.find(x=>x.id===id);if(!c||!canAssign(c))return;
+  const ms=users.filter(u=>(u.role==='mechanic'||u.role==='supervisor')&&u.status==='approved');
+  openModal(`<h3>${L('指派给维修员','Assign to a mechanic')} <span class="mono">${esc(c.caseNo)}</span></h3><div class="f"><label for="as_u">${L('维修员','Mechanic')}</label><select id="as_u"><option value="">—</option>${ms.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></div><p class="meta" id="as_e" style="color:#b00020"></p><div class="acts"><button class="btn plain" data-act="close">${L('取消','Cancel')}</button><button class="btn pri" id="as_go">${L('指派','Assign')}</button></div>`);
+  $('#as_go').onclick=async()=>{
+    const uid2=$('#as_u').value;if(!uid2){$('#as_e').textContent=L('请选择维修员','Choose a mechanic');return}
+    const t=users.find(u=>u.id===uid2);$('#as_e').textContent=L('正在获取 GPS 位置…','Getting GPS location…');
+    const gps=await getGps();if(!gps){$('#as_e').textContent=L('必须获取 GPS 位置，请允许浏览器定位后重试','GPS location is required. Allow location access and try again.');return}
+    const now=new Date().toISOString();
+    try{const up=await sb.from('cases').update({claimedById:t.id,claimedByName:t.name,claimedAt:now,status:'claimed',tech:t.name,updatedAt:now,updatedById:me.id,updatedByName:me.name,log:[...(c.log||[]),{at:now,by:me.id,byName:me.name,from:c.status,to:'claimed',...(gps?{gps}:{})}]}).eq('id',id).eq('claimedById','').select();
+      if(up.error||!up.data.length)throw up.error||new Error('taken');closeModal();toast(L('已指派给 ','Assigned to ')+t.name);notifyAfter({...c,...up.data[0],gps})}
+    catch(x){$('#as_e').textContent=L('指派失败，可能已被他人领取','Assign failed, it may already be taken')}refreshData()}}
 function confirmBox(text,fn){openModal(`<h3>${text}</h3><div class="acts"><button class="btn plain" data-act="close">${L('取消','Cancel')}</button><button class="btn out" id="cy">${L('确认','Confirm')}</button></div>`);$('#cy').onclick=async()=>{closeModal();try{await fn()}catch(x){toast(L('操作失败','Failed'))}}}
 
 function userModal(u,self){
@@ -638,6 +653,7 @@ document.addEventListener('click',e=>{
   else if(a==='new')caseModal(null);
   else if(a==='open'){const c=cases.find(x=>x.id===v);c&&caseModal(c)}
   else if(a==='claim')claim(v);
+  else if(a==='assign')assignDialog(v);
   else if(a==='del'){const c=cases.find(x=>x.id===v);confirmBox(L('删除工作 ','Delete job ')+esc(c.caseNo)+'?',async()=>{const r=await sb.from('cases').delete().eq('id',v).select();if(r.error||!r.data.length)throw r.error||new Error('denied');refreshData()})}
   else if(a==='close')closeModal();
   else if(a==='washare'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen('',caseSummary(c))}
