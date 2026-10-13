@@ -105,6 +105,12 @@ button.vopt:hover{background:var(--blush)}
 .seg{display:inline-flex;border:1.5px solid rgba(255,255,255,.75);border-radius:6px;overflow:hidden}
 .seg button{background:transparent;border:0;color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:6px 12px;min-height:34px}
 .seg button.on{background:#fff;color:var(--maroon)}
+.phg{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-bottom:8px}
+.ph{position:relative;aspect-ratio:1;background:var(--mist);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.ph img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
+.phx{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(25,29,36,.8);color:#fff;font-size:16px;line-height:1;padding:0}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+.lb img{max-width:100%;max-height:100%;object-fit:contain}
 .foot{height:14px;background:var(--footer);margin:40px -16px 0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:6px;z-index:90;max-width:90vw}
 </style>
@@ -248,14 +254,14 @@ function boardView(){
   order.map(t=>`<div class="grp-h">${tyChip(t)}<span class="n">${groups[t].length} ${L('项','jobs')}</span></div>${tableFor(groups[t])}`).join('')}`;
 }
 function tableFor(rows){
-  const H=[L('操作','Actions'),L('工作编号','Case No.'),L('状态','Status'),L('报告日期','Report date'),L('报告时间','Report time'),L('开单人','Opened by'),L('车牌 Vehicle No.','Vehicle No.'),'LM / LP No.',L('机构','Organization'),L('品牌 Make','Make'),L('型号 Model','Model'),L('底盘 Chassis','Chassis'),L('顾客','Customer'),L('地点','Location'),L('司机','Driver'),L('司机电话','Driver phone'),L('问题描述','Problem'),
+  const H=[L('操作','Actions'),L('工作编号','Case No.'),L('状态','Status'),L('报告日期','Report date'),L('报告时间','Report time'),L('开单人','Opened by'),L('车牌 Vehicle No.','Vehicle No.'),'LM / LP No.',L('机构','Organization'),L('品牌 Make','Make'),L('型号 Model','Model'),L('底盘 Chassis','Chassis'),L('顾客','Customer'),L('地点','Location'),L('司机','Driver'),L('司机电话','Driver phone'),L('问题描述','Problem'),L('照片','Photos'),
    L('领取人','Claimed by'),L('领取日期','Claim date'),L('领取时间','Claim time'),L('更新人','Updated by'),L('更新日期','Update date'),L('更新时间','Update time'),L('故障原因','Fault cause'),L('工作流程','Workflow'),L('开工日期','Start date'),L('开工时间','Start time'),L('完工日期','End date'),L('完工时间','End time'),L('工时(小时)','Work hrs'),L('维修技师','Technician'),L('共计加班(小时)','Total OT (hrs)')];
   const hrs=c=>{if(!(c.wsD&&c.wsT&&c.weD&&c.weT))return'';const h=(new Date(c.weD+'T'+c.weT)-new Date(c.wsD+'T'+c.wsT))/36e5;return h>=0?h.toFixed(1):''};
   const td=(v,cls='')=>v===''||v==null?`<td class="nil ${cls}">—</td>`:`<td class="${cls}">${esc(v)}</td>`;
   return `<div class="tw"><table><thead><tr>${H.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(c=>`<tr class="row" data-act="open" data-v="${c.id}">
    <td class="act">${canClaim(c)?`<button class="btn sm pri" data-act="claim" data-v="${c.id}">${L('领取','Claim')}</button>`:''}${isAdmin()?`<button class="btn sm danger" data-act="del" data-v="${c.id}">${L('删除','Delete')}</button>`:''}</td>
    ${td(c.caseNo,'mono')}<td>${sChip(c.status)}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uName(c.createdById,c.createdByName))}
-   ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}
+   ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}${td((c.photos||[]).length?String(c.photos.length):'')}
    ${td(uName(c.claimedById,c.claimedByName))}${td(fD(c.claimedAt))}${td(fT(c.claimedAt))}${td(uName(c.updatedById,c.updatedByName))}${td(fD(c.updatedAt))}${td(fT(c.updatedAt))}
    ${td(c.fault,'long')}${td(c.workflow,'long')}${td(c.wsD)}${td(c.wsT)}${td(c.weD)}${td(c.weT)}${td(hrs(c))}${td(c.tech)}${td(c.ot)}</tr>`).join('')}</tbody></table></div>`;
 }
@@ -280,6 +286,7 @@ function caseModal(c){
   const v=VMAP[(c.vehicleNo||'').toUpperCase()]||[];
   const mech=users.filter(u=>u.role==='mechanic'&&u.status==='approved');
   modal={id:c.id||null};
+  PH={paths:[...(c.photos||[])],urls:{},queue:[],caseId:c.id||null,canEdit:isNew||eR||eW,busy:false};
   openModal(`<h3>${isNew?L('报告车辆问题','Report a vehicle problem'):`<span class="mono">${esc(c.caseNo)}</span> ${sChip(c.status)} ${tyChip(c.subType)}`}</h3>
   ${isNew?'':`<p class="meta"><span>${L('开单','Opened by')}: <b>${esc(uName(c.createdById,c.createdByName))}</b> ${fD(c.createdAt)} ${fT(c.createdAt)}</span><span>${L('领取','Claimed by')}: <b>${c.claimedById?esc(uName(c.claimedById,c.claimedByName)):'—'}</b> ${fD(c.claimedAt)} ${fT(c.claimedAt)}</span>${c.updatedAt?`<span>${L('最后更新','Last update')}: <b>${esc(uName(c.updatedById,c.updatedByName))}</b> ${fD(c.updatedAt)} ${fT(c.updatedAt)}</span>`:''}</p>
   ${(c.log||[]).length?`<div class="meta" style="flex-direction:column;gap:2px"><b>${L('状态记录','Status history')}</b>${[...c.log].reverse().map(x=>`<span>${fD(x.at)} ${fT(x.at)} · <b>${esc(uName(x.by,x.byName))}</b> · ${esc(sname(x.from)||'—')} → <b>${esc(sname(x.to))}</b></span>`).join('')}</div>`:''}`}
@@ -304,8 +311,11 @@ function caseModal(c){
    ${fld('c_ed',L('完工日期','End date'),c.weD||'',{type:'date',dis:!eW})}${fld('c_et',L('完工时间','End time'),c.weT||'',{type:'time',dis:!eW})}
    ${fld('c_ot',L('共计加班（小时）','Total overtime (hrs)'),c.ot??'',{type:'number',dis:!eW,attrs:'min="0" step="0.5"'})}
   </div></fieldset>`}
+  <fieldset id="phf"><legend id="phl"></legend><div id="phg" class="phg"></div><div id="phb" class="acts" style="justify-content:flex-start"></div>
+   <input type="file" id="ph_cam" accept="image/*" capture="environment" hidden><input type="file" id="ph_gal" accept="image/*" multiple hidden></fieldset>
   <div class="err" id="c_err"></div>
   <div class="acts"><button type="button" class="btn plain" data-act="close">${eR||eW?L('取消','Cancel'):L('关闭','Close')}</button>${eR||eW?`<button class="btn pri" type="submit">${isNew?L('提交','Submit'):L('保存','Save')}</button>`:''}</div></form>`);
+  renderPhotos();loadPhotoUrls(PH.paths).then(renderPhotos);
   const vi=$('#c_veh'),vl=$('#vlist');
   const showList=filter=>{const q=filter.trim().toUpperCase();const m=VEH.filter(x=>!q||x[0].toUpperCase().includes(q)||(x[6]||'').toUpperCase().includes(q)||x[2].toUpperCase().includes(q));
     vl.innerHTML=m.length?m.map(x=>`<button type="button" class="vopt" data-vno="${esc(x[0])}"><b class="mono">${esc(x[0])}</b> <span>${esc(x[2]||'—')}</span> <small>${esc(x[1])}</small></button>`).join(''):`<div class="vopt">${L('没有符合的车辆','No matching vehicle')}</div>`;vl.hidden=false};
@@ -316,6 +326,43 @@ function caseModal(c){
 }
 function fillVeh(){const v=VMAP[$('#c_veh').value.trim().toUpperCase()]||[];
   const set=(id,x)=>{$(id).textContent=x||'—'};set('#r_lm',v[6]);set('#r_type',v[2]);set('#r_org',v[1]);set('#r_make',v[3]);set('#r_model',v[4]);set('#r_ch',v[5])}
+
+let PH={paths:[],urls:{},queue:[],caseId:null,canEdit:false,busy:false};
+const MAXPH=10;
+function compress(file){return new Promise((res,rej)=>{const img=new Image(),u=URL.createObjectURL(file);
+  img.onload=()=>{const r=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?res(b):rej(new Error('img')),'image/jpeg',0.8)};
+  img.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('img'))};img.src=u})}
+async function loadPhotoUrls(paths){const need=paths.filter(p=>!PH.urls[p]);if(!need.length)return;
+  const r=await sb.storage.from('case-photos').createSignedUrls(need,3600);(r.data||[]).forEach(x=>{if(x.signedUrl)PH.urls[x.path]=x.signedUrl})}
+function renderPhotos(){
+  const g=$('#phg');if(!g)return;const n=PH.paths.length+PH.queue.length;
+  $('#phl').textContent=L('照片','Photos')+' ('+n+'/'+MAXPH+')';
+  g.innerHTML=[...PH.paths.map((p,i)=>({k:'p'+i,u:PH.urls[p]})),...PH.queue.map((q,i)=>({k:'q'+i,u:q.url}))].map(x=>`<div class="ph">${x.u?`<img src="${esc(x.u)}" alt="" data-act="phview" data-v="${esc(x.u)}">`:'<span class="mute">…</span>'}${PH.canEdit?`<button type="button" class="phx" data-act="phdel" data-v="${x.k}" aria-label="${L('删除照片','Remove photo')}">×</button>`:''}</div>`).join('')||`<span style="color:var(--mute)">${L('还没有照片。','No photos yet.')}</span>`;
+  $('#phb').innerHTML=PH.canEdit?`<button type="button" class="btn sm" data-act="phcam" ${n>=MAXPH||PH.busy?'disabled':''}>${L('拍照','Take photo')}</button><button type="button" class="btn sm plain" data-act="phgal" ${n>=MAXPH||PH.busy?'disabled':''}>${L('从相册选择','Choose from gallery')}</button>${PH.busy?`<span style="color:var(--mute)">${L('上传中…','Uploading…')}</span>`:''}`:'';
+}
+async function uploadPhoto(caseId,blob){const path=caseId+'/'+Date.now()+'-'+rnd()+'.jpg';
+  const r=await sb.storage.from('case-photos').upload(path,blob,{contentType:'image/jpeg'});if(r.error)throw r.error;return path}
+async function savePhotos(id,paths){const now=new Date().toISOString();
+  const r=await sb.from('cases').update({photos:paths,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',id).select();
+  if(r.error||!r.data.length)throw r.error||new Error('denied')}
+async function addPhotos(files){
+  const room=MAXPH-PH.paths.length-PH.queue.length;const list=[...files].slice(0,room);
+  if(files.length>room)toast(L('最多 10 张照片。','Maximum 10 photos.'));
+  if(!list.length)return;PH.busy=true;renderPhotos();
+  try{
+    const blobs=[];for(const f of list)blobs.push(await compress(f));
+    if(PH.caseId){const added=[];for(const b of blobs)added.push(await uploadPhoto(PH.caseId,b));
+      const next=[...PH.paths,...added];await savePhotos(PH.caseId,next);PH.paths=next;await loadPhotoUrls(next)}
+    else blobs.forEach(b=>PH.queue.push({blob:b,url:URL.createObjectURL(b)}));
+  }catch(x){toast(L('照片上传失败','Photo upload failed'))}
+  PH.busy=false;renderPhotos()}
+async function removePhoto(k){
+  const i=+k.slice(1);
+  if(k[0]==='q'){URL.revokeObjectURL(PH.queue[i].url);PH.queue.splice(i,1);renderPhotos();return}
+  const p=PH.paths[i],next=PH.paths.filter((_,j)=>j!==i);
+  try{await savePhotos(PH.caseId,next);PH.paths=next;sb.storage.from('case-photos').remove([p])}catch(x){toast(L('删除失败','Remove failed'))}
+  renderPhotos()}
+function lightbox(u){const d=document.createElement('div');d.className='lb';d.innerHTML=`<img src="${esc(u)}" alt="">`;d.onclick=()=>d.remove();document.body.append(d)}
 
 async function saveCase(e){
   e.preventDefault();const c=cases.find(x=>x.id===modal.id);const isNew=!c;const err=$('#c_err');
@@ -330,7 +377,9 @@ async function saveCase(e){
   try{
     if(isNew){
       const dt=new Date(),no='C'+String(dt.getFullYear()).slice(2)+p2(dt.getMonth()+1)+p2(dt.getDate())+'-'+rnd().slice(0,4).toUpperCase();
-      const ins=await sb.from('cases').insert({...d,caseNo:no,status:'open',log:[{at:now,by:me.id,byName:me.name,from:'',to:'open'}],createdAt:now,createdById:me.id,createdByName:me.name,claimedById:'',claimedByName:'',claimedAt:''});
+      const nid=crypto.randomUUID(),paths=[];
+      for(const q of PH.queue)paths.push(await uploadPhoto(nid,q.blob));
+      const ins=await sb.from('cases').insert({...d,id:nid,photos:paths,caseNo:no,status:'open',log:[{at:now,by:me.id,byName:me.name,from:'',to:'open'}],createdAt:now,createdById:me.id,createdByName:me.name,claimedById:'',claimedByName:'',claimedAt:''});
       if(ins.error)throw ins.error;
     }else{
       if(canEditWork(c)){const o=g('#c_ot');Object.assign(d,{status:g('#c_st'),tech:g('#c_te'),fault:g('#c_ft'),workflow:g('#c_wf'),wsD:g('#c_sd'),wsT:g('#c_stt'),weD:g('#c_ed'),weT:g('#c_et'),ot:o===''?'':String(Number(o))})}
@@ -340,7 +389,7 @@ async function saveCase(e){
       const up=await sb.from('cases').update(d).eq('id',c.id).select();
       if(up.error||!up.data.length)throw up.error||new Error('denied');
     }
-    closeModal();toast(L('已保存','Saved'));refreshData();
+    PH.queue.forEach(q=>URL.revokeObjectURL(q.url));closeModal();toast(L('已保存','Saved'));refreshData();
   }catch(x){err.textContent=L('保存失败：','Save failed: ')+(x.message||x.code||'')}
 }
 async function claim(id){
@@ -408,6 +457,10 @@ document.addEventListener('click',e=>{
   else if(a==='claim')claim(v);
   else if(a==='del'){const c=cases.find(x=>x.id===v);confirmBox(L('删除工作 ','Delete job ')+esc(c.caseNo)+'?',async()=>{const r=await sb.from('cases').delete().eq('id',v).select();if(r.error||!r.data.length)throw r.error||new Error('denied');refreshData()})}
   else if(a==='close')closeModal();
+  else if(a==='phcam')$('#ph_cam').click();
+  else if(a==='phgal')$('#ph_gal').click();
+  else if(a==='phdel')removePhoto(v);
+  else if(a==='phview')lightbox(v);
   else if(a==='uapprove')setUser(v,{status:'approved'});
   else if(a==='ureject')setUser(v,{status:'rejected'});
   else if(a==='uedit')userModal(uById(v),false);
@@ -415,6 +468,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('submit',e=>{const id=e.target.id;if(id==='authf')doAuth(e);else if(id==='cf')saveCase(e);else if(id==='uf')saveUser(e)});
 document.addEventListener('input',e=>{if(e.target.id==='fq'){filt.q=e.target.value;const p=e.target.selectionStart;render();const f=$('#fq');f.focus();f.setSelectionRange(p,p)}});
-document.addEventListener('change',e=>{if(e.target.id==='ftype'){filt.type=e.target.value;render()}else if(e.target.id==='fmine'){filt.mine=e.target.checked;render()}});
+document.addEventListener('change',e=>{if(e.target.id==='ph_cam'||e.target.id==='ph_gal'){const f=[...e.target.files];e.target.value='';addPhotos(f);return}
+  if(e.target.id==='ftype'){filt.type=e.target.value;render()}else if(e.target.id==='fmine'){filt.mine=e.target.checked;render()}});
 boot();
 </script>
