@@ -93,6 +93,8 @@ legend{font-weight:700;padding:0 6px;font-size:11px;letter-spacing:.12em;text-tr
 .f input,.f select,.f textarea,.f .ro{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 9px;min-height:36px;width:100%;min-width:0}
 .f .ro{display:flex;align-items:center;color:var(--ink);background:var(--mist)}
 .f textarea{min-height:36px;height:40px;resize:vertical}
+fieldset.recdone{background:#fde9ef}fieldset.recdone .f input,fieldset.recdone .f select,fieldset.recdone .f textarea{background:#fde9ef;opacity:1;color:inherit}
+fieldset.recopen{background:#fff}fieldset.recopen .f input,fieldset.recopen .f select,fieldset.recopen .f textarea{background:#fff}
 .f input[disabled],.f select[disabled],.f textarea[disabled]{opacity:.65}
 .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
 .err{color:var(--alert);margin:6px 0 0;min-height:1em}
@@ -328,7 +330,7 @@ function recBlocks(c,eW,mech){
     const ed=eW&&!locked&&(isMgr()||i===ei);const stEd=eW&&!locked&&i===ei;const ck=eW&&(isMgr()||i===ei);
     const st=r.status||c.status,te=r.tech!=null&&r.tech!==''?r.tech:((rs[i-1]||{}).tech||c.tech||'');
     const dI=r.clockIn||'',dO=r.clockOut||'';
-    h+=`<fieldset><legend>${L('维修记录 ','Repair record ')}${i+1}${locked?' 🔒':''}</legend>${r.at?`<p class="meta"><span>${L('保存','Saved')}: <b>${esc(r.byName||'')}</b> ${fD(r.at)} ${fT(r.at)}</span></p>`:''}<div class="g">
+    h+=`<fieldset class="${i<len&&recFilled(r)?'recdone':'recopen'}"><legend>${L('维修记录 ','Repair record ')}${i+1}${locked?' 🔒':''}</legend>${r.at?`<p class="meta"><span>${L('保存','Saved')}: <b>${esc(r.byName||'')}</b> ${fD(r.at)} ${fT(r.at)}</span></p>`:''}<div class="g">
    <div class="f"><label for="r${i}_st">${L('工作状态','Work status')}</label><select id="r${i}_st" ${stEd?'':'disabled'}>${STS.map(s=>`<option value="${s}" ${st===s?'selected':''}>${esc(sname(s))}</option>`).join('')}</select></div>
    ${fld('r'+i+'_te',L('维修技师','Technician'),te,{dis:!ed})}
    ${fld('r'+i+'_wd',L('完成的工作描述 Description of Work Done','Description of Work Done'),r.workDone||'',{type:'textarea',w:1,dis:!ed})}
