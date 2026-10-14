@@ -92,7 +92,7 @@ legend{font-weight:700;padding:0 6px;font-size:11px;letter-spacing:.12em;text-tr
 .f label i{color:var(--alert);font-style:normal}
 .f input,.f select,.f textarea,.f .ro{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 9px;min-height:36px;width:100%;min-width:0}
 .f .ro{display:flex;align-items:center;color:var(--ink);background:var(--mist)}
-.f textarea{min-height:64px;resize:vertical}
+.f textarea{min-height:36px;height:40px;resize:vertical}
 .f input[disabled],.f select[disabled],.f textarea[disabled]{opacity:.65}
 .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
 .err{color:var(--alert);margin:6px 0 0;min-height:1em}
@@ -246,7 +246,7 @@ function render(){
     <button class="me" data-act="profile" title="${L('修改我的资料','Edit my profile')}">${rChip(me.role)}<b>${esc(me.name)}</b></button>
    </div></div>
   ${demo&&real?`<div class="banner">${L('演示模式：正以「'+rname(demo)+'」的权限查看。','Demo mode: viewing with the permissions of '+rname(demo)+'.')}</div>`:''}
-  <div class="tabs"><button class="tab ${tab==='board'?'on':''}" data-act="tab" data-v="board">${L('总表板','Board')}</button>
+  <div class="tabs"><button class="tab ${tab==='board'?'on':''}" data-act="tab" data-v="board">${L('总表板','Board')}</button><button class="tab ${tab==='own'?'on':''}" data-act="tab" data-v="own">${L('我的表板','Own Board')}</button>
    ${isAdmin()?`<button class="tab ${tab==='users'?'on':''}" data-act="tab" data-v="users">${L('用户管理','Users')}${pend?`<span class="badge">${pend}</span>`:''}</button>`:''}</div>
   ${tab==='users'&&isAdmin()?usersView():boardView()}<div class="foot"></div></div>`;
 }
@@ -275,7 +275,7 @@ function filtered(){
   return cases.filter(c=>{
     if(filt.status&&stOf(c)!==filt.status)return false;
     if(filt.type&&(c.repairLocation||'')!==(filt.type===UN?'':filt.type))return false;
-    if(filt.mine&&c.claimedById!==me.id&&c.createdById!==me.id)return false;
+    if((filt.mine||tab==='own')&&c.claimedById!==me.id&&c.createdById!==me.id)return false;
     if(q&&![c.caseNo,c.vehicleNo,c.lmNo,c.org,c.customer,c.driverName,c.driverPhone,c.location,c.issue,c.make,c.model].some(x=>String(x||'').toLowerCase().includes(q)))return false;
     return true});
 }
@@ -297,13 +297,13 @@ function boardView(){
   order.map(t=>`<div class="grp-h">${rlChip(t)}<span class="n">${groups[t].length} ${L('项','jobs')}</span></div>${tableFor(groups[t])}`).join('')}`;
 }
 function tableFor(rows){
-  const H=[L('操作','Actions'),L('工作编号','Case No.'),L('状态','Status'),L('报告日期','Report date'),L('报告时间','Report time'),L('开单人','Opened by'),L('车牌 Vehicle No.','Vehicle No.'),'LM / LP No.',L('机构','Organization'),L('设备序列号','Equipment Serial No.'),L('类型','Type'),L('品牌 Make','Make'),L('型号 Model','Model'),L('底盘 Chassis','Chassis'),L('顾客','Customer'),L('地点','Location'),L('司机','Driver'),L('司机电话','Driver phone'),L('问题描述','Problem'),L('照片','Photos'),
+  const H=[L('操作','Actions'),L('工作编号','Case No.'),L('状态','Status'),L('报告日期','Report date'),L('报告时间','Report time'),L('开单人','Opened by'),L('接单人','Job taken by'),L('车牌 Vehicle No.','Vehicle No.'),'LM / LP No.',L('机构','Organization'),L('设备序列号','Equipment Serial No.'),L('类型','Type'),L('品牌 Make','Make'),L('型号 Model','Model'),L('底盘 Chassis','Chassis'),L('顾客','Customer'),L('地点','Location'),L('司机','Driver'),L('司机电话','Driver phone'),L('问题描述','Problem'),L('照片','Photos'),
    L('指派给','Assigned to'),L('指派日期','Assigned date'),L('指派时间','Assigned time'),L('更新人','Updated by'),L('更新日期','Update date'),L('更新时间','Update time'),L('GPS 位置','GPS location'),L('维修技师','Technician'),L('上班打卡','Clock in'),L('下班打卡','Clock out'),L('共计加班(小时)','Total OT (hrs)'),L('完成的工作描述','Description of Work Done'),L('使用的零件','Parts Used'),L('所需零件（采购用）','Parts Required (For Purchasing)'),L('维修员签名','Mechanic signature'),L('客户签名','Customer signature'),L('删除人 / 时间','Deleted by / at'),L('删除原因','Delete reason')];
   const hrs=c=>{if(!(c.wsD&&c.wsT&&c.weD&&c.weT))return'';const h=(new Date(c.weD+'T'+c.weT)-new Date(c.wsD+'T'+c.wsT))/36e5;return h>=0?h.toFixed(1):''};
   const td=(v,cls='')=>v===''||v==null?`<td class="nil ${cls}">—</td>`:`<td class="${cls}">${esc(v)}</td>`;
   return `<div class="tw"><table><thead><tr>${H.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(c=>`<tr class="row" data-act="open" data-v="${c.id}">
    <td class="act">${canClaim(c)?`<button class="btn sm pri" data-act="claim" data-v="${c.id}">${L('接单','Take')}</button>`:''}${canAssign(c)?`<button class="btn sm" data-act="assign" data-v="${c.id}">${L('指派','Assign')}</button>`:''}${isAdmin()&&!c.deletedAt?`<button class="btn sm danger" data-act="del" data-v="${c.id}">${L('删除','Delete')}</button>`:''}</td>
-   ${td(c.caseNo,'mono')}<td>${sChip(stOf(c))}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}
+   ${td(c.caseNo,'mono')}<td>${sChip(stOf(c))}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}${td(c.claimedById?uLabel(c.claimedById,c.claimedByName):'')}
    ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.serialNo,'mono')}<td>${c.subType?tyChip(c.subType):'<span style="color:var(--mute)">—</span>'}</td>${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}${td((c.photos||[]).length?String(c.photos.length):'')}
    ${td(uLabel(c.claimedById,c.claimedByName))}${td(fD(c.claimedAt))}${td(fT(c.claimedAt))}${td(uLabel(c.updatedById,c.updatedByName))}${td(fD(c.updatedAt))}${td(fT(c.updatedAt))}${lastGps(c)?`<td><a href="${mapUrl(lastGps(c))}" target="_blank" rel="noopener" style="color:var(--title)">${esc(gpsTxt(lastGps(c)))}</a></td>`:'<td class="nil">—</td>'}
    ${td(c.tech)}${td(ckIn(c)?fD(ckIn(c))+' '+fT(ckIn(c)):'')}${td(ckOut(c)?fD(ckOut(c))+' '+fT(ckOut(c)):'')}${td(otSum(c))}${td(recJoin(c,'workDone'),'long')}${td(recJoin(c,'partsUsed'),'long')}${td(recJoin(c,'partsRequired'),'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}${td(c.deletedAt?(c.deletedByName||'')+' · '+fD(c.deletedAt)+' '+fT(c.deletedAt):'')}${td(c.deleteReason,'long')}</tr>`).join('')}</tbody></table></div>`;
