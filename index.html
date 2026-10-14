@@ -135,8 +135,9 @@ const ROLES=['admin','supervisor','mechanic','operation','management','departmen
 const RN={admin:['管理员','Admin'],supervisor:['主管','Supervisor'],mechanic:['维修员','Mechanic'],operation:['运营','Operation'],management:['管理层','Management'],department_head:['部门主管','Department Head']};
 const rname=r=>RN[r]?RN[r][lang==='zh'?0:1]:r;
 const STS=['open','claimed','in_progress','waiting_parts','completed'];
-const SN={open:['待领取','Open'],claimed:['已分配','Assigned'],in_progress:['维修中','In progress'],waiting_parts:['等待零件','Waiting parts'],completed:['已完成','Completed']};
-const SH={open:5,claimed:195,in_progress:38,waiting_parts:290,completed:145};
+const SN={deleted:['已删除','Deleted'],open:['待领取','Open'],claimed:['已分配','Assigned'],in_progress:['维修中','In progress'],waiting_parts:['等待零件','Waiting parts'],completed:['已完成','Completed']};
+const SH={deleted:350,open:5,claimed:195,in_progress:38,waiting_parts:290,completed:145};
+const stOf=c=>c.deletedAt?'deleted':c.status;
 const sname=s=>SN[s]?SN[s][lang==='zh'?0:1]:s;
 const UN='__none';
 const RLS=['Yard','Ad-hoc','Body Work','Maintenance'];
@@ -166,10 +167,10 @@ const isMgr=()=>eff()==='admin';
 const uLabel=(id,fb)=>{const u=uById(id);const n=(u&&u.name)||fb||'';return n?(u&&u.phone?n+' · '+u.phone:n):''};
 const toast=m=>{const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2600)};
 
-function canEditReport(c){return isMgr()||c.claimedById===me.id||(c.createdById===me.id&&c.status==='open')}
-function canEditWork(c){return isMgr()||(!!c.claimedById&&c.claimedById===me.id)}
-function canAssign(c){return (eff()==='supervisor'||eff()==='admin')&&!c.claimedById}
-function canClaim(c){return (eff()==='mechanic'||eff()==='supervisor')&&!c.claimedById}
+function canEditReport(c){if(c.deletedAt)return false;return isMgr()||(c.createdById===me.id&&c.status==='open'&&!c.claimedById)}
+function canEditWork(c){if(c.deletedAt)return false;return isMgr()||(!!c.claimedById&&c.claimedById===me.id)}
+function canAssign(c){return (eff()==='supervisor'||eff()==='admin')&&!c.claimedById&&!c.deletedAt}
+function canClaim(c){return ['mechanic','supervisor','admin'].includes(eff())&&!c.claimedById&&!c.deletedAt}
 
 const ERR={name_taken:['该姓名已被使用，请加上区别（例如全名）。','That name is already used. Please make it unique.'],bad_login:['姓名或密码错误。','Wrong name or password.'],phone_taken:['该手机号码已被使用。','That phone number is already registered.'],invalid:['资料不正确（密码至少 6 位）。','Invalid details (password needs at least 6 characters).'],last_admin:['至少要保留一位已批准的管理员。','At least one approved admin must remain.'],forbidden:['没有权限。','Not allowed.'],unauthorized:['请重新登录。','Please log in again.']};
 const errMsg=x=>{const e=ERR[x&&x.code];return e?L(e[0],e[1]):L('操作失败，请重试。','Failed, please try again.')};
@@ -261,7 +262,7 @@ function authView(){
 function filtered(){
   const q=filt.q.trim().toLowerCase();
   return cases.filter(c=>{
-    if(filt.status&&c.status!==filt.status)return false;
+    if(filt.status&&stOf(c)!==filt.status)return false;
     if(filt.type&&(c.repairLocation||'')!==(filt.type===UN?'':filt.type))return false;
     if(filt.mine&&c.claimedById!==me.id&&c.createdById!==me.id)return false;
     if(q&&![c.caseNo,c.vehicleNo,c.lmNo,c.org,c.customer,c.driverName,c.driverPhone,c.location,c.issue,c.make,c.model].some(x=>String(x||'').toLowerCase().includes(q)))return false;
@@ -269,13 +270,13 @@ function filtered(){
 }
 function boardView(){
   const all=cases,list=filtered();
-  const cnt=s=>all.filter(c=>c.status===s).length;
+  const cnt=s=>all.filter(c=>stOf(c)===s).length;
   const types=[...RLS,''];
   const groups={};list.forEach(c=>(groups[c.repairLocation||'']=groups[c.repairLocation||'']||[]).push(c));
   const order=Object.keys(groups).sort((a,b)=>{const ia=RLS.indexOf(a),ib=RLS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
   const canNew=['admin','operation'].includes(eff());
   return `<div class="strip"><button class="tile ${!filt.status?'on':''}" style="--h:220" data-act="fstatus" data-v=""><span class="l">${L('全部','All')}</span><span class="n">${all.length}</span></button>
-   ${STS.map(s=>`<button class="tile ${filt.status===s?'on':''}" style="--h:${SH[s]}" data-act="fstatus" data-v="${s}"><span class="l">${esc(sname(s))}</span><span class="n">${cnt(s)}</span></button>`).join('')}</div>
+   ${[...STS,'deleted'].map(s=>`<button class="tile ${filt.status===s?'on':''}" style="--h:${SH[s]}" data-act="fstatus" data-v="${s}"><span class="l">${esc(sname(s))}</span><span class="n">${cnt(s)}</span></button>`).join('')}</div>
   <div class="bar"><input type="search" id="fq" placeholder="${L('搜索车牌 / 顾客 / 司机 / 地点…','Search vehicle / customer / driver / location…')}" value="${esc(filt.q)}">
    <select id="ftype"><option value="">${L('全部维修组','All repair teams')}</option>${types.map(t=>`<option value="${t||UN}" ${filt.type===(t||UN)?'selected':''}>${esc(rlname(t))}</option>`).join('')}</select>
    <button class="btn plain" data-act="exportall">${L('导出全部 PDF','Export all as PDF')}</button>
@@ -286,15 +287,15 @@ function boardView(){
 }
 function tableFor(rows){
   const H=[L('操作','Actions'),L('工作编号','Case No.'),L('状态','Status'),L('报告日期','Report date'),L('报告时间','Report time'),L('开单人','Opened by'),L('车牌 Vehicle No.','Vehicle No.'),'LM / LP No.',L('机构','Organization'),L('设备序列号','Equipment Serial No.'),L('类型','Type'),L('品牌 Make','Make'),L('型号 Model','Model'),L('底盘 Chassis','Chassis'),L('顾客','Customer'),L('地点','Location'),L('司机','Driver'),L('司机电话','Driver phone'),L('问题描述','Problem'),L('照片','Photos'),
-   L('指派给','Assigned to'),L('指派日期','Assigned date'),L('指派时间','Assigned time'),L('更新人','Updated by'),L('更新日期','Update date'),L('更新时间','Update time'),L('GPS 位置','GPS location'),L('维修技师','Technician'),L('共计加班(小时，下午5点后)','Total OT (hrs, after 5pm)'),L('完成的工作描述','Description of Work Done'),L('使用的零件','Parts Used'),L('所需零件（采购用）','Parts Required (For Purchasing)'),L('维修员签名','Mechanic signature'),L('客户签名','Customer signature')];
+   L('指派给','Assigned to'),L('指派日期','Assigned date'),L('指派时间','Assigned time'),L('更新人','Updated by'),L('更新日期','Update date'),L('更新时间','Update time'),L('GPS 位置','GPS location'),L('维修技师','Technician'),L('上班打卡','Clock in'),L('下班打卡','Clock out'),L('共计加班(小时)','Total OT (hrs)'),L('完成的工作描述','Description of Work Done'),L('使用的零件','Parts Used'),L('所需零件（采购用）','Parts Required (For Purchasing)'),L('维修员签名','Mechanic signature'),L('客户签名','Customer signature'),L('删除人 / 时间','Deleted by / at'),L('删除原因','Delete reason')];
   const hrs=c=>{if(!(c.wsD&&c.wsT&&c.weD&&c.weT))return'';const h=(new Date(c.weD+'T'+c.weT)-new Date(c.wsD+'T'+c.wsT))/36e5;return h>=0?h.toFixed(1):''};
   const td=(v,cls='')=>v===''||v==null?`<td class="nil ${cls}">—</td>`:`<td class="${cls}">${esc(v)}</td>`;
   return `<div class="tw"><table><thead><tr>${H.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(c=>`<tr class="row" data-act="open" data-v="${c.id}">
-   <td class="act">${canClaim(c)?`<button class="btn sm pri" data-act="claim" data-v="${c.id}">${L('接单','Take')}</button>`:''}${canAssign(c)?`<button class="btn sm" data-act="assign" data-v="${c.id}">${L('指派','Assign')}</button>`:''}${isAdmin()?`<button class="btn sm danger" data-act="del" data-v="${c.id}">${L('删除','Delete')}</button>`:''}</td>
-   ${td(c.caseNo,'mono')}<td>${sChip(c.status)}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}
+   <td class="act">${canClaim(c)?`<button class="btn sm pri" data-act="claim" data-v="${c.id}">${L('接单','Take')}</button>`:''}${canAssign(c)?`<button class="btn sm" data-act="assign" data-v="${c.id}">${L('指派','Assign')}</button>`:''}${isAdmin()&&!c.deletedAt?`<button class="btn sm danger" data-act="del" data-v="${c.id}">${L('删除','Delete')}</button>`:''}</td>
+   ${td(c.caseNo,'mono')}<td>${sChip(stOf(c))}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}
    ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.serialNo,'mono')}<td>${c.subType?tyChip(c.subType):'<span style="color:var(--mute)">—</span>'}</td>${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}${td((c.photos||[]).length?String(c.photos.length):'')}
    ${td(uLabel(c.claimedById,c.claimedByName))}${td(fD(c.claimedAt))}${td(fT(c.claimedAt))}${td(uLabel(c.updatedById,c.updatedByName))}${td(fD(c.updatedAt))}${td(fT(c.updatedAt))}${lastGps(c)?`<td><a href="${mapUrl(lastGps(c))}" target="_blank" rel="noopener" style="color:var(--title)">${esc(gpsTxt(lastGps(c)))}</a></td>`:'<td class="nil">—</td>'}
-   ${td(c.tech)}${td(otHrs(c))}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}</tr>`).join('')}</tbody></table></div>`;
+   ${td(c.tech)}${td(c.clockIn?fD(c.clockIn)+' '+fT(c.clockIn):'')}${td(c.clockOut?fD(c.clockOut)+' '+fT(c.clockOut):'')}${td(c.ot)}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}${td(c.deletedAt?(c.deletedByName||'')+' · '+fD(c.deletedAt)+' '+fT(c.deletedAt):'')}${td(c.deleteReason,'long')}</tr>`).join('')}</tbody></table></div>`;
 }
 function usersView(){
   const rows=[...users].sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)||(b.createdAt||'').localeCompare(a.createdAt||''));
@@ -319,10 +320,11 @@ function caseModal(c){
   gpsP=isNew?getGps():null;
   modal={id:c.id||null};
   PH={paths:[...(c.photos||[])],urls:{},queue:[],caseId:c.id||null,canEdit:isNew||eR||eW,busy:false};
-  openModal(`<h3>${isNew?L('报告车辆问题','Report a vehicle problem'):`<span class="mono">${esc(c.caseNo)}</span> ${sChip(c.status)} ${rlChip(c.repairLocation)} ${tyChip(c.subType)}`}</h3>
+  openModal(`<h3>${isNew?L('报告车辆问题','Report a vehicle problem'):`<span class="mono">${esc(c.caseNo)}</span> ${sChip(stOf(c))} ${rlChip(c.repairLocation)} ${tyChip(c.subType)}`}</h3>
   ${isNew?'':`<p class="meta"><span>${L('开单','Opened by')}: <b>${esc(uLabel(c.createdById,c.createdByName))}</b> ${fD(c.createdAt)} ${fT(c.createdAt)}</span><span>${L('指派给','Assigned to')}: <b>${c.claimedById?esc(uLabel(c.claimedById,c.claimedByName)):'—'}</b> ${fD(c.claimedAt)} ${fT(c.claimedAt)}</span>${c.updatedAt?`<span>${L('最后更新','Last update')}: <b>${esc(uLabel(c.updatedById,c.updatedByName))}</b> ${fD(c.updatedAt)} ${fT(c.updatedAt)}</span>`:''}</p>
+  ${!isNew&&c.deletedAt?`<p class="meta" style="color:#b00020"><span>${L('已删除','Deleted')}: <b>${esc(c.deletedByName||'')}</b> ${fD(c.deletedAt)} ${fT(c.deletedAt)}</span><span>${L('原因','Reason')}: <b>${esc(c.deleteReason||'')}</b></span></p>`:''}
   ${(c.log||[]).length?`<div class="meta" style="flex-direction:column;gap:3px"><b>${L('状态记录','Status history')}</b>${histRows(c).reverse().map(x=>`<span><b>${esc(sname(x.status))}</b> · ${L('开始','Start')} ${fD(x.start)} ${fT(x.start)} · ${L('结束','End')} ${x.end?fD(x.end)+' '+fT(x.end):'—'} · ${esc(uName(x.by,x.byName))}${x.gps?` · <a href="${mapUrl(x.gps)}" target="_blank" rel="noopener" style="color:var(--title)">GPS ${esc(gpsTxt(x.gps))}</a>`:''}</span>`).join('')}</div>`:''}`}
-  ${!isNew&&!eR&&!eW?`<p class="meta">${L('只读：只有开单人（未被领取时）、领取工作的维修员和管理员可以更改。','Read only: only the opener (before it is claimed), the mechanic who claimed it, and admins can change this.')}</p>`:''}
+  ${!isNew&&!eR&&!eW?`<p class="meta">${L('只读：只有开单人（未被接单时）、被指派的维修员/主管（仅维修记录）和管理员可以更改。','Read only: only the opener (before it is taken), the assigned mechanic / supervisor (repair record only) and admins can change this.')}</p>`:''}
   <form id="cf">
   <fieldset><legend>${L('车辆与报告','Vehicle & report')}</legend><div class="g">
    <div class="f"><label for="c_veh">${L('车牌 Vehicle No.','Vehicle No.')} <i>*</i></label><div style="position:relative"><input id="c_veh" value="${esc(c.vehicleNo||'')}" autocomplete="off" placeholder="${L('点击选择或输入车牌','Click to choose or type')}" ${eR?'':'disabled'}><div id="vlist" class="vlist" hidden></div></div></div>
@@ -341,15 +343,17 @@ function caseModal(c){
    ${fld('c_wd',L('完成的工作描述 Description of Work Done','Description of Work Done'),c.workDone||'',{type:'textarea',w:1,dis:!eW})}
    ${fld('c_pu',L('使用的零件 Parts Used','Parts Used'),c.partsUsed||'',{type:'textarea',w:1,dis:!eW})}
    ${fld('c_pr',L('所需零件（采购用）Parts Required (For Purchasing)','Parts Required (For Purchasing)'),c.partsRequired||'',{type:'textarea',w:1,dis:!eW})}
-   ${fld('c_ot',L('共计加班（小时，下午5点后自动计算）','Total overtime (hrs, auto, after 5pm)'),otHrs(c),{dis:true})}
+   <div class="f"><label>${L('上班打卡 Clock in','Clock in')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_in" class="mono">${c.clockIn?fD(c.clockIn)+' '+fT(c.clockIn):'—'}</span><button type="button" class="btn sm" data-act="clockin" ${eW?'':'disabled'}>${L('上班打卡','Clock in')}</button></div></div>
+   <div class="f"><label>${L('下班打卡 Clock out','Clock out')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_out" class="mono">${c.clockOut?fD(c.clockOut)+' '+fT(c.clockOut):'—'}</span><button type="button" class="btn sm" data-act="clockout" ${eW?'':'disabled'}>${L('下班打卡','Clock out')}</button></div></div>
+   ${fld('c_ot',L('共计加班（小时）','Total overtime (hrs)'),c.ot??'',{type:'number',dis:!eW,attrs:'min="0" step="0.5"'})}
   </div></fieldset>`}
-  ${isNew?'':`<fieldset><legend>${L('签名','Signatures')}</legend><div class="g" id="sgg"></div></fieldset>`}
+  ${isNew?'':`<fieldset id="sgf" ${c.status==='completed'?'':'hidden'}><legend>${L('签名','Signatures')}</legend><div class="g" id="sgg"></div></fieldset>`}
   <fieldset id="phf"><legend id="phl"></legend><div id="phg" class="phg"></div><div id="phb" class="acts" style="justify-content:flex-start"></div>
    <input type="file" id="ph_cam" accept="image/*" capture="environment" hidden><input type="file" id="ph_gal" accept="image/*" multiple hidden></fieldset>
   <div class="err" id="c_err"></div>
   <div class="acts">${isNew?'':`<button type="button" class="btn plain" data-act="exportone">${L('导出 PDF','Export PDF')}</button><button type="button" class="btn plain" data-act="washare">${L('WhatsApp 分享','WhatsApp share')}</button><button type="button" class="btn plain" data-act="wadriver" style="margin-right:auto" ${waNum(c.driverPhone)?'':'disabled'}>${L('WhatsApp 司机','WhatsApp driver')}</button>`}<button type="button" class="btn plain" data-act="close">${eR||eW?L('取消','Cancel'):L('关闭','Close')}</button>${eR||eW?`<button class="btn pri" type="submit">${isNew?L('提交','Submit'):L('保存','Save')}</button>`:''}</div></form>`);
   SG={caseId:c.id||null,mech:!isNew&&eW,cust:!isNew&&(eR||eW)};renderPhotos();renderSigs();loadPhotoUrls([...PH.paths,...Object.values(c.sigs||{}).map(x=>x.path)]).then(()=>{renderPhotos();renderSigs()});
-  const cst=$('#c_st');if(cst)cst.addEventListener('change',()=>{gpsP=getGps();toast(L('正在获取 GPS 位置…','Getting GPS location…'))});
+  const cst=$('#c_st');if(cst)cst.addEventListener('change',()=>{const sf=$('#sgf');if(sf)sf.hidden=cst.value!=='completed';gpsP=getGps();toast(L('正在获取 GPS 位置…','Getting GPS location…'))});
   const vi=$('#c_veh'),vl=$('#vlist');
   const showList=filter=>{const q=filter.trim().toUpperCase();const m=VEH.filter(x=>!q||x[0].toUpperCase().includes(q)||(x[7]||'').toUpperCase().includes(q)||(x[2]||'').toUpperCase().includes(q)||x[3].toUpperCase().includes(q));
     vl.innerHTML=m.length?m.map(x=>`<button type="button" class="vopt" data-vno="${esc(x[0])}"><b class="mono">${esc(x[0])}</b> <span>${esc(x[3]||'—')}</span> <small>${esc(x[1])}</small></button>`).join(''):`<div class="vopt">${L('没有符合的车辆','No matching vehicle')}</div>`;vl.hidden=false};
@@ -493,9 +497,10 @@ function reportHtml(list,urls){
     return `<section class="pg"><header><div><span class="br">POLLISUM</span><h1>${esc(L('维修工作单','Repair job card'))}</h1></div><div class="cn">${esc(c.caseNo)}<br><span>${esc(sname(c.status))}</span></div></header>
     <h2>${esc(L('车辆','Vehicle'))}</h2>${kv([['Vehicle No.',c.vehicleNo],['LM / LP No.',c.lmNo],[L('机构','Organization'),c.org],[L('设备序列号','Equipment Serial No.'),c.serialNo],[L('类型','Vehicle Sub Type'),c.subType],[L('品牌','Make'),c.make],[L('型号','Model'),c.model],[L('底盘','Chassis'),c.chassis],[L('维修组','Repair Team'),rlname(c.repairLocation)],[L('顾客','Customer'),c.customer]])}
     <h2>${esc(L('报告','Report'))}</h2>${kv([[L('开单人','Opened by'),uName(c.createdById,c.createdByName)],[L('报告日期时间','Reported'),dt(c.createdAt)],[L('地点','Location'),c.location],[L('司机','Driver'),c.driverName],[L('司机电话','Driver phone'),c.driverPhone]])}${full(L('问题描述','Problem'),c.issue)}
-    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('共计加班(小时，下午5点后)','Total OT (hrs, after 5pm)'),otHrs(c)]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
+    ${c.deletedAt?`<h2>${esc(L('已删除','Deleted'))}</h2>${kv([[L('删除人','Deleted by'),c.deletedByName],[L('删除时间','Deleted at'),dt(c.deletedAt)]])}${full(L('删除原因','Reason for deleting'),c.deleteReason)}`:''}
+    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('上班打卡','Clock in'),dt(c.clockIn)],[L('下班打卡','Clock out'),dt(c.clockOut)],[L('共计加班(小时)','Total OT (hrs)'),c.ot]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
     ${ph?`<h2>${esc(L('照片','Photos'))} (${(c.photos||[]).length})</h2><div class="pgrid">${ph}</div>`:''}
-    <h2>${esc(L('签名','Signatures'))}</h2><div class="sgrow">${sg('mechanic')}${sg('customer')}</div></section>`}).join('');
+    ${c.status==='completed'&&!c.deletedAt?`<h2>${esc(L('签名','Signatures'))}</h2><div class="sgrow">${sg('mechanic')}${sg('customer')}</div>`:''}</section>`}).join('');
   return `<!doctype html><html lang="${lang==='zh'?'zh':'en'}"><head><meta charset="utf-8"><title>${list.length===1?esc(list[0].caseNo):'Mechanic-jobs-'+fD(new Date().toISOString())}</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&display=swap">
   <style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;font:13.33px/1.4 Calibri,Carlito,'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;color:#191D24;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -567,7 +572,7 @@ async function saveCase(e){
       const ins=await sb.from('cases').insert({...d,id:nid,photos:paths,caseNo:no,status:'open',log:[{at:now,by:me.id,byName:me.name,from:'',to:'open',...(gps?{gps}:{})}],createdAt:now,createdById:me.id,createdByName:me.name,claimedById:'',claimedByName:'',claimedAt:''});
       if(ins.error)throw ins.error;
     }else{
-      if(canEditWork(c)){Object.assign(d,{status:g('#c_st'),tech:g('#c_te'),workDone:g('#c_wd'),partsUsed:g('#c_pu'),partsRequired:g('#c_pr')})}
+      if(canEditWork(c)){Object.assign(d,{status:g('#c_st'),tech:g('#c_te'),workDone:g('#c_wd'),partsUsed:g('#c_pu'),partsRequired:g('#c_pr'),ot:(()=>{const o=g('#c_ot');return o===''||o==null?'':String(Number(o))})()})}
       if(isMgr()&&$('#c_cb')){const id=$('#c_cb').value;if(id!==(c.claimedById||'')){d.claimedById=id;d.claimedByName=uName(id);d.claimedAt=id?now:'';if(id&&c.status==='open'&&(!d.status||d.status==='open'))d.status='claimed';if(!id&&c.status!=='completed')d.status='open'}}
       Object.assign(d,{updatedAt:now,updatedById:me.id,updatedByName:me.name});
       let gps=null;const changed=d.status&&d.status!==c.status;
@@ -582,6 +587,24 @@ async function saveCase(e){
     if(!isNew&&notifyInfo)notifyAfter(notifyInfo);
   }catch(x){err.textContent=L('保存失败：','Save failed: ')+(x.message||x.code||'')}
 }
+function delDialog(id){
+  const c=cases.find(x=>x.id===id);if(!c||!isAdmin())return;
+  openModal(`<h3>${L('删除工作 ','Delete job ')}<span class="mono">${esc(c.caseNo)}</span></h3><p class="meta">${L('删除后仍会显示在看板上，状态为“已删除”。','The job stays on the board with the status "Deleted".')}</p><div class="g" style="grid-template-columns:1fr">${fld('dl_r',L('删除原因','Reason for deleting'),'',{type:'textarea',w:1,req:1})}</div><div class="err" id="dl_e"></div><div class="acts"><button class="btn plain" data-act="close">${L('取消','Cancel')}</button><button class="btn out" id="dl_go">${L('确认删除','Delete')}</button></div>`);
+  $('#dl_go').onclick=async()=>{
+    const r=$('#dl_r').value.trim();if(r.length<3){$('#dl_e').textContent=L('必须填写删除原因','A reason is required');return}
+    const now=new Date().toISOString();
+    try{const up=await sb.from('cases').update({deletedAt:now,deletedById:me.id,deletedByName:me.name,deleteReason:r,updatedAt:now,updatedById:me.id,updatedByName:me.name,log:[...(c.log||[]),{at:now,by:me.id,byName:me.name,from:c.status,to:'deleted',reason:r}]}).eq('id',id).select();
+      if(up.error||!up.data.length)throw up.error||new Error('denied');closeModal();toast(L('已删除','Deleted'));refreshData()}
+    catch(x){$('#dl_e').textContent=L('删除失败','Delete failed')}}}
+async function clock(f){
+  const c=cases.find(x=>x.id===modal.id);if(!c||!canEditWork(c))return;
+  if(c[f]&&!isMgr()){toast(L('已打卡，只有管理员可以修改','Already recorded. Only an admin can change it.'));return}
+  const now=new Date().toISOString();
+  try{const up=await sb.from('cases').update({[f]:now,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',c.id).select();
+    if(up.error||!up.data.length)throw up.error||new Error('denied');
+    const el=$(f==='clockIn'?'#ck_in':'#ck_out');if(el)el.textContent=fD(now)+' '+fT(now);
+    toast(f==='clockIn'?L('已上班打卡','Clocked in'):L('已下班打卡','Clocked out'));refreshData()}
+  catch(x){toast(L('打卡失败','Clock failed'))}}
 async function claim(id){
   const c=cases.find(x=>x.id===id);if(!c||!canClaim(c))return;
   toast(L('正在获取 GPS 位置…','Getting GPS location…'));const gps=await getGps();const now=new Date().toISOString();
@@ -669,7 +692,9 @@ document.addEventListener('click',e=>{
   else if(a==='open'){const c=cases.find(x=>x.id===v);c&&caseModal(c)}
   else if(a==='claim')claim(v);
   else if(a==='assign')assignDialog(v);
-  else if(a==='del'){const c=cases.find(x=>x.id===v);confirmBox(L('删除工作 ','Delete job ')+esc(c.caseNo)+'?',async()=>{const r=await sb.from('cases').delete().eq('id',v).select();if(r.error||!r.data.length)throw r.error||new Error('denied');refreshData()})}
+  else if(a==='del')delDialog(v);
+  else if(a==='clockin')clock('clockIn');
+  else if(a==='clockout')clock('clockOut');
   else if(a==='close')closeModal();
   else if(a==='washare'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen('',caseSummary(c))}
   else if(a==='wadriver'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen(waNum(c.driverPhone),driverMsg(c))}
