@@ -171,7 +171,7 @@ function canEditWork(c){return isMgr()||(!!c.claimedById&&c.claimedById===me.id)
 function canAssign(c){return (eff()==='supervisor'||eff()==='admin')&&!c.claimedById}
 function canClaim(c){return (eff()==='mechanic'||eff()==='supervisor')&&!c.claimedById}
 
-const ERR={phone_taken:['该手机号码已被使用。','That phone number is already registered.'],invalid:['资料不正确（密码至少 6 位）。','Invalid details (password needs at least 6 characters).'],last_admin:['至少要保留一位已批准的管理员。','At least one approved admin must remain.'],forbidden:['没有权限。','Not allowed.'],unauthorized:['请重新登录。','Please log in again.']};
+const ERR={name_taken:['该姓名已被使用，请加上区别（例如全名）。','That name is already used. Please make it unique.'],bad_login:['姓名或密码错误。','Wrong name or password.'],phone_taken:['该手机号码已被使用。','That phone number is already registered.'],invalid:['资料不正确（密码至少 6 位）。','Invalid details (password needs at least 6 characters).'],last_admin:['至少要保留一位已批准的管理员。','At least one approved admin must remain.'],forbidden:['没有权限。','Not allowed.'],unauthorized:['请重新登录。','Please log in again.']};
 const errMsg=x=>{const e=ERR[x&&x.code];return e?L(e[0],e[1]):L('操作失败，请重试。','Failed, please try again.')};
 async function fn(action,payload){
   const {data}=await sb.auth.getSession();const s=data.session;
@@ -242,14 +242,14 @@ function render(){
 function authView(){
   const rec=JSON.parse(ls('mech_recent')||'[]');
   const reg=mode==='register';
-  const pk=!reg&&pickPhone?rec.find(r=>r.phone===pickPhone):null;
+  const pk=!reg&&pickPhone?rec.find(r=>r.name===pickPhone):null;
   return `<div class="auth"><h2>${reg?L('注册','Register'):L('登录','Log in')}</h2>
-  <p class="sub">${reg?L('用手机号码注册，需管理员批准后才能使用。（系统里第一位注册者自动成为管理员。）','Register with your phone number. An administrator must approve you first.'):L('用手机号码和密码登录。','Log in with your phone number and password.')}</p>
-  ${!reg&&!pk&&rec.length?`<div class="rec">${rec.map(r=>`<button data-act="pick" data-v="${esc(r.phone)}">${rChip(r.role)}<span>${esc(r.name)}</span><span class="mono" style="margin-left:auto">${esc(r.phone)}</span></button>`).join('')}</div>`:''}
-  ${!reg&&pk?`<div class="rec"><div style="display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:8px 10px">${rChip(pk.role)}<b>${esc(pk.name)}</b><span class="mono" style="margin-left:auto">${esc(pk.phone)}</span></div></div>`:''}
+  <p class="sub">${reg?L('用手机号码注册，需管理员批准后才能使用。（系统里第一位注册者自动成为管理员。）','Register with your phone number. An administrator must approve you first.'):L('用姓名和密码登录。','Log in with your name and password.')}</p>
+  ${!reg&&!pk&&rec.length?`<div class="rec">${rec.map(r=>`<button data-act="pick" data-v="${esc(r.name)}">${rChip(r.role)}<span>${esc(r.name)}</span></button>`).join('')}</div>`:''}
+  ${!reg&&pk?`<div class="rec"><div style="display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:8px 10px">${rChip(pk.role)}<b>${esc(pk.name)}</b></div></div>`:''}
   <form id="authf" class="g" style="grid-template-columns:1fr">
-   ${reg?`<div class="f"><label for="a_name">${L('姓名','Name')} <i>*</i></label><input id="a_name" required></div>`:''}
-   ${pk?'':`<div class="f"><label for="a_phone">${L('手机号码','Phone number')} <i>*</i></label><input id="a_phone" inputmode="tel" required></div>`}
+   ${pk?'':`<div class="f"><label for="a_name">${L('姓名','Name')} <i>*</i></label><input id="a_name" required autocomplete="username"></div>`}
+   ${!reg?'':`<div class="f"><label for="a_phone">${L('手机号码','Phone number')} <i>*</i></label><input id="a_phone" inputmode="tel" required></div>`}
    <div class="f"><label for="a_pw">${L('密码','Password')} <i>*</i></label><input id="a_pw" type="password" required minlength="6"></div>
    ${reg?`<div class="f"><label for="a_role">${L('申请角色','Requested role')}</label><select id="a_role"><option value="mechanic">${rname('mechanic')}</option><option value="operation">${rname('operation')}</option><option value="supervisor">${rname('supervisor')}</option><option value="management">${rname('management')}</option><option value="department_head">${rname('department_head')}</option></select></div>`:''}
    <div class="err" id="a_err">${esc(msg)}</div>
@@ -635,21 +635,20 @@ async function saveUser(e){
 async function setUser(id,d){try{await fn('update',{id,...d});toast(L('已更新','Updated'))}catch(x){toast(errMsg(x))}refreshData()}
 
 async function doAuth(e){
-  e.preventDefault();const phone=normPhone($('#a_phone')?$('#a_phone').value:pickPhone),pw=$('#a_pw').value;const err=$('#a_err');
+  e.preventDefault();const name=($('#a_name')?$('#a_name').value.trim():pickPhone),pw=$('#a_pw').value;const err=$('#a_err');
   const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
   try{
-    if(mode==='register'){
-      await fn('register',{name:$('#a_name').value.trim(),phone,password:pw,role:$('#a_role').value});
-    }
-    const r=await sb.auth.signInWithPassword({email:'p'+phone+'@mechanic.invalid',password:pw});
-    if(r.error){err.textContent=L('手机号码或密码错误。','Wrong phone number or password.');btn.disabled=false;return}
+    if(mode==='register')await fn('register',{name,phone:normPhone($('#a_phone').value),password:pw,role:$('#a_role').value});
+    const lr=await fn('login',{name,password:pw});
+    const r=await sb.auth.setSession({access_token:lr.session.access_token,refresh_token:lr.session.refresh_token});
+    if(r.error||!r.data.user)throw Object.assign(new Error('login'),{code:'bad_login'});
     uid=r.data.user.id;await loadData();ready.u=ready.c=true;startRealtime();
     if(me)remember(me);render();
   }catch(x){err.textContent=errMsg(x);btn.disabled=false}
 }
-function remember(u){const r=JSON.parse(ls('mech_recent')||'[]').filter(x=>x.phone!==u.phone);r.unshift({phone:u.phone,name:u.name,role:u.role});ls('mech_recent',JSON.stringify(r.slice(0,5)))}
+function remember(u){const r=JSON.parse(ls('mech_recent')||'[]').filter(x=>x.name!==u.name);r.unshift({phone:u.phone,name:u.name,role:u.role});ls('mech_recent',JSON.stringify(r.slice(0,5)))}
 async function leave(forget){
-  if(forget&&me){const r=JSON.parse(ls('mech_recent')||'[]').filter(x=>x.phone!==me.phone);ls('mech_recent',JSON.stringify(r))}
+  if(forget&&me){const r=JSON.parse(ls('mech_recent')||'[]').filter(x=>x.name!==me.name);ls('mech_recent',JSON.stringify(r))}
   try{await sb.auth.signOut()}catch(e){}
   if(chan){sb.removeChannel(chan);chan=null}
   uid=null;me=null;users=[];cases=[];demo=null;tab='board';mode='login';pickPhone=null;const o=$('#ov');o&&o.remove();render()}
@@ -657,7 +656,7 @@ async function leave(forget){
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,v=b.dataset.v;
   if(a==='lang'){lang=v||(lang==='zh'?'en':'zh');ls('mech_lang',lang);const o=$('#ov');o&&o.remove();render()}
-  else if(a==='demo'){const n=ROLES[(ROLES.indexOf(eff())+1)%3];demo=n==='admin'?null:n;tab='board';render()}
+  else if(a==='demo'){const n=ROLES[(ROLES.indexOf(eff())+1)%ROLES.length];demo=n==='admin'?null:n;tab='board';render()}
   else if(a==='switch')leave(false);
   else if(a==='logout')leave(true);
   else if(a==='profile')userModal(me,true);
