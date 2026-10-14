@@ -138,7 +138,16 @@ const STS=['open','claimed','in_progress','waiting_parts','completed'];
 const SN={deleted:['已删除','Deleted'],open:['待领取','Open'],claimed:['已分配','Assigned'],in_progress:['维修中','In progress'],waiting_parts:['等待零件','Waiting parts'],completed:['已完成','Completed']};
 const SH={deleted:350,open:5,claimed:195,in_progress:38,waiting_parts:290,completed:145};
 const curLog=c=>{const l=c.log||[];return l[l.length-1]||{}};
-const ckIn=c=>curLog(c).clockIn||'',ckOut=c=>curLog(c).clockOut||'';
+const REC_MAX=10;
+const recFilled=r=>!!(r&&((r.workDone||'').trim()||(r.partsUsed||'').trim()||(r.partsRequired||'').trim()));
+const recsOf=c=>{if(Array.isArray(c.records)&&c.records.length)return c.records;
+  if(c.workDone||c.partsUsed||c.partsRequired||c.ot)return[{status:c.status,tech:c.tech,workDone:c.workDone,partsUsed:c.partsUsed,partsRequired:c.partsRequired,ot:c.ot,clockIn:'',clockOut:''}];return[]};
+const recLayout=c=>{const rs=recsOf(c),len=rs.length;const n=len===0?1:Math.min(REC_MAX,len+(recFilled(rs[len-1])?1:0));return{rs,len,n,ei:n-1}};
+const lastRec=c=>{const r=recsOf(c);return r[r.length-1]||{}};
+const ckIn=c=>lastRec(c).clockIn||'',ckOut=c=>lastRec(c).clockOut||'';
+const recJoin=(c,k)=>{const rs=recsOf(c);const a=rs.map((x,i)=>x[k]?[i,x[k]]:null).filter(Boolean);if(!a.length)return'';if(a.length===1&&a[0][0]===0)return a[0][1];return a.map(([i,t])=>(i+1)+') '+t).join('\n')};
+const otSum=c=>{const rs=recsOf(c);let t=0,any=false;rs.forEach(r=>{if(r.ot!==''&&r.ot!=null&&!isNaN(Number(r.ot))){t+=Number(r.ot);any=true}});return any?String(t):''};
+let EI=-1;
 const stOf=c=>c.deletedAt?'deleted':c.status;
 const sname=s=>SN[s]?SN[s][lang==='zh'?0:1]:s;
 const UN='__none';
@@ -297,7 +306,7 @@ function tableFor(rows){
    ${td(c.caseNo,'mono')}<td>${sChip(stOf(c))}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}
    ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.serialNo,'mono')}<td>${c.subType?tyChip(c.subType):'<span style="color:var(--mute)">—</span>'}</td>${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}${td((c.photos||[]).length?String(c.photos.length):'')}
    ${td(uLabel(c.claimedById,c.claimedByName))}${td(fD(c.claimedAt))}${td(fT(c.claimedAt))}${td(uLabel(c.updatedById,c.updatedByName))}${td(fD(c.updatedAt))}${td(fT(c.updatedAt))}${lastGps(c)?`<td><a href="${mapUrl(lastGps(c))}" target="_blank" rel="noopener" style="color:var(--title)">${esc(gpsTxt(lastGps(c)))}</a></td>`:'<td class="nil">—</td>'}
-   ${td(c.tech)}${td(ckIn(c)?fD(ckIn(c))+' '+fT(ckIn(c)):'')}${td(ckOut(c)?fD(ckOut(c))+' '+fT(ckOut(c)):'')}${td(c.ot)}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}${td(c.deletedAt?(c.deletedByName||'')+' · '+fD(c.deletedAt)+' '+fT(c.deletedAt):'')}${td(c.deleteReason,'long')}</tr>`).join('')}</tbody></table></div>`;
+   ${td(c.tech)}${td(ckIn(c)?fD(ckIn(c))+' '+fT(ckIn(c)):'')}${td(ckOut(c)?fD(ckOut(c))+' '+fT(ckOut(c)):'')}${td(otSum(c))}${td(recJoin(c,'workDone'),'long')}${td(recJoin(c,'partsUsed'),'long')}${td(recJoin(c,'partsRequired'),'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}${td(c.deletedAt?(c.deletedByName||'')+' · '+fD(c.deletedAt)+' '+fT(c.deletedAt):'')}${td(c.deleteReason,'long')}</tr>`).join('')}</tbody></table></div>`;
 }
 function usersView(){
   const rows=[...users].sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)||(b.createdAt||'').localeCompare(a.createdAt||''));
@@ -310,6 +319,26 @@ function usersView(){
 function openModal(html){closeModal();const o=document.createElement('div');o.className='ov';o.id='ov';o.innerHTML=`<div class="md" role="dialog" aria-modal="true">${html}</div>`;
   o.addEventListener('mousedown',e=>{if(e.target===o)closeModal()});document.body.append(o);const f=o.querySelector('input:not([disabled]),select:not([disabled]),textarea:not([disabled])');f&&f.focus()}
 function closeModal(){const o=$('#ov');if(o){o.remove();render()}}
+function recBlocks(c,eW,mech){
+  const{rs,len,n,ei}=recLayout(c);EI=ei;
+  const asg=isMgr()?`<fieldset><legend>${L('指派','Assignment')}</legend><div class="g"><div class="f"><label for="c_cb">${L('指派给（仅管理员可改）','Assigned to (admin only)')}</label><select id="c_cb"><option value="">—</option>${mech.map(u=>`<option value="${u.id}" ${c.claimedById===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div></fieldset>`:'';
+  let h=asg;
+  for(let i=0;i<n;i++){
+    const r=rs[i]||{};const locked=i<len&&recFilled(r)&&!isMgr();
+    const ed=eW&&!locked&&(isMgr()||i===ei);const stEd=eW&&!locked&&i===ei;const ck=eW&&(isMgr()||i===ei);
+    const st=r.status||c.status,te=r.tech!=null&&r.tech!==''?r.tech:((rs[i-1]||{}).tech||c.tech||'');
+    const dI=r.clockIn||'',dO=r.clockOut||'';
+    h+=`<fieldset><legend>${L('维修记录 ','Repair record ')}${i+1}${locked?' 🔒':''}</legend>${r.at?`<p class="meta"><span>${L('保存','Saved')}: <b>${esc(r.byName||'')}</b> ${fD(r.at)} ${fT(r.at)}</span></p>`:''}<div class="g">
+   <div class="f"><label for="r${i}_st">${L('工作状态','Work status')}</label><select id="r${i}_st" ${stEd?'':'disabled'}>${STS.map(s=>`<option value="${s}" ${st===s?'selected':''}>${esc(sname(s))}</option>`).join('')}</select></div>
+   ${fld('r'+i+'_te',L('维修技师','Technician'),te,{dis:!ed})}
+   ${fld('r'+i+'_wd',L('完成的工作描述 Description of Work Done','Description of Work Done'),r.workDone||'',{type:'textarea',w:1,dis:!ed})}
+   ${fld('r'+i+'_pu',L('使用的零件 Parts Used','Parts Used'),r.partsUsed||'',{type:'textarea',w:1,dis:!ed})}
+   ${fld('r'+i+'_pr',L('所需零件（采购用）Parts Required (For Purchasing)','Parts Required (For Purchasing)'),r.partsRequired||'',{type:'textarea',w:1,dis:!ed})}
+   <div class="f"><label>${L('上班打卡 Clock in','Clock in')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_in_${i}" class="mono">${dI?fD(dI)+' '+fT(dI):'—'}</span><button type="button" class="btn sm" data-act="clockin" data-v="${i}" ${ck?'':'disabled'}>${L('上班打卡','Clock in')}</button></div></div>
+   <div class="f"><label>${L('下班打卡 Clock out','Clock out')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_out_${i}" class="mono">${dO?fD(dO)+' '+fT(dO):'—'}</span><button type="button" class="btn sm" data-act="clockout" data-v="${i}" ${ck?'':'disabled'}>${L('下班打卡','Clock out')}</button></div></div>
+   ${fld('r'+i+'_ot',L('共计加班（小时）','Total overtime (hrs)'),r.ot??'',{type:'number',dis:!ed,attrs:'min="0" step="0.5"'})}
+  </div></fieldset>`}
+  return h}
 const fld=(id,label,val,o={})=>{const{type='text',req=false,dis=false,w=false,attrs=''}=o;
   return `<div class="f ${w?'w':''}"><label for="${id}">${label}${req?' <i>*</i>':''}</label>${type==='textarea'?`<textarea id="${id}" ${dis?'disabled':''} ${attrs}>${esc(val)}</textarea>`:`<input id="${id}" type="${type}" value="${esc(val)}" ${dis?'disabled':''} ${attrs}>`}</div>`};
 const ro=(label,val,id)=>`<div class="f"><label>${label}</label><div class="ro" ${id?`id="${id}"`:''}>${val?esc(val):'—'}</div></div>`;
@@ -339,24 +368,14 @@ function caseModal(c){
    ${fld('c_dp',L('司机电话号码','Driver phone'),c.driverPhone||'',{req:1,dis:!eR,attrs:'inputmode="tel"'})}
    ${fld('c_is',L('问题描述','Problem description'),c.issue||'',{type:'textarea',w:1,req:1,dis:!eR})}
   </div></fieldset>
-  ${isNew?'':`<fieldset><legend>${L('维修记录','Repair record')}</legend><div class="g">
-   <div class="f"><label for="c_st">${L('工作状态','Work status')}</label><select id="c_st" ${eW?'':'disabled'}>${STS.map(s=>`<option value="${s}" ${c.status===s?'selected':''}>${esc(sname(s))}</option>`).join('')}</select></div>
-   ${isMgr()?`<div class="f"><label for="c_cb">${L('指派给（仅管理员可改）','Assigned to (admin only)')}</label><select id="c_cb"><option value="">—</option>${mech.map(u=>`<option value="${u.id}" ${c.claimedById===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div>`:''}
-   ${fld('c_te',L('维修技师','Technician'),c.tech||'',{dis:!eW})}
-   ${fld('c_wd',L('完成的工作描述 Description of Work Done','Description of Work Done'),c.workDone||'',{type:'textarea',w:1,dis:!eW})}
-   ${fld('c_pu',L('使用的零件 Parts Used','Parts Used'),c.partsUsed||'',{type:'textarea',w:1,dis:!eW})}
-   ${fld('c_pr',L('所需零件（采购用）Parts Required (For Purchasing)','Parts Required (For Purchasing)'),c.partsRequired||'',{type:'textarea',w:1,dis:!eW})}
-   <div class="f"><label>${L('上班打卡 Clock in（当前状态：','Clock in (current status: ')}${esc(sname(c.status))}${L('）',')')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_in" class="mono">${ckIn(c)?fD(ckIn(c))+' '+fT(ckIn(c)):'—'}</span><button type="button" class="btn sm" data-act="clockin" ${eW?'':'disabled'}>${L('上班打卡','Clock in')}</button></div></div>
-   <div class="f"><label>${L('下班打卡 Clock out（当前状态：','Clock out (current status: ')}${esc(sname(c.status))}${L('）',')')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_out" class="mono">${ckOut(c)?fD(ckOut(c))+' '+fT(ckOut(c)):'—'}</span><button type="button" class="btn sm" data-act="clockout" ${eW?'':'disabled'}>${L('下班打卡','Clock out')}</button></div></div>
-   ${fld('c_ot',L('共计加班（小时）','Total overtime (hrs)'),c.ot??'',{type:'number',dis:!eW,attrs:'min="0" step="0.5"'})}
-  </div></fieldset>`}
+  ${isNew?'':recBlocks(c,eW,mech)}
   ${isNew?'':`<fieldset id="sgf" ${c.status==='completed'?'':'hidden'}><legend>${L('签名','Signatures')}</legend><div class="g" id="sgg"></div></fieldset>`}
   <fieldset id="phf"><legend id="phl"></legend><div id="phg" class="phg"></div><div id="phb" class="acts" style="justify-content:flex-start"></div>
    <input type="file" id="ph_cam" accept="image/*" capture="environment" hidden><input type="file" id="ph_gal" accept="image/*" multiple hidden></fieldset>
   <div class="err" id="c_err"></div>
   <div class="acts">${isNew?'':`<button type="button" class="btn plain" data-act="exportone">${L('导出 PDF','Export PDF')}</button><button type="button" class="btn plain" data-act="washare">${L('WhatsApp 分享','WhatsApp share')}</button><button type="button" class="btn plain" data-act="wadriver" style="margin-right:auto" ${waNum(c.driverPhone)?'':'disabled'}>${L('WhatsApp 司机','WhatsApp driver')}</button>`}<button type="button" class="btn plain" data-act="close">${eR||eW?L('取消','Cancel'):L('关闭','Close')}</button>${eR||eW?`<button class="btn pri" type="submit">${isNew?L('提交','Submit'):L('保存','Save')}</button>`:''}</div></form>`);
   SG={caseId:c.id||null,mech:!isNew&&eW,cust:!isNew&&(eR||eW)};renderPhotos();renderSigs();loadPhotoUrls([...PH.paths,...Object.values(c.sigs||{}).map(x=>x.path)]).then(()=>{renderPhotos();renderSigs()});
-  const cst=$('#c_st');if(cst)cst.addEventListener('change',()=>{const sf=$('#sgf');if(sf)sf.hidden=cst.value!=='completed';gpsP=getGps();toast(L('正在获取 GPS 位置…','Getting GPS location…'))});
+  const cst=EI>=0?$('#r'+EI+'_st'):null;if(cst)cst.addEventListener('change',()=>{const sf=$('#sgf');if(sf)sf.hidden=cst.value!=='completed';gpsP=getGps();toast(L('正在获取 GPS 位置…','Getting GPS location…'))});
   const vi=$('#c_veh'),vl=$('#vlist');
   const showList=filter=>{const q=filter.trim().toUpperCase();const m=VEH.filter(x=>!q||x[0].toUpperCase().includes(q)||(x[7]||'').toUpperCase().includes(q)||(x[2]||'').toUpperCase().includes(q)||x[3].toUpperCase().includes(q));
     vl.innerHTML=m.length?m.map(x=>`<button type="button" class="vopt" data-vno="${esc(x[0])}"><b class="mono">${esc(x[0])}</b> <span>${esc(x[3]||'—')}</span> <small>${esc(x[1])}</small></button>`).join(''):`<div class="vopt">${L('没有符合的车辆','No matching vehicle')}</div>`;vl.hidden=false};
@@ -400,7 +419,7 @@ function caseSummary(c){
     L('司机：','Driver: ')+(c.driverName||'—')+(c.driverPhone?' '+c.driverPhone:''),
     L('问题：','Problem: ')+(c.issue||'—'),
     L('指派给：','Assigned to: ')+(nm||'—'),
-    c.workDone?L('完成的工作：','Work done: ')+c.workDone:'',
+    recJoin(c,'workDone')?L('完成的工作：','Work done: ')+recJoin(c,'workDone'):'',
     lastGps(c)?'GPS: '+gpsTxt(lastGps(c))+' '+mapUrl(lastGps(c)):'',
     APP_URL].filter(Boolean).join('\n')}
 function driverMsg(c){
@@ -510,7 +529,7 @@ function reportHtml(list,urls){
     <h2>${esc(L('车辆','Vehicle'))}</h2>${kv([['Vehicle No.',c.vehicleNo],['LM / LP No.',c.lmNo],[L('机构','Organization'),c.org],[L('设备序列号','Equipment Serial No.'),c.serialNo],[L('类型','Vehicle Sub Type'),c.subType],[L('品牌','Make'),c.make],[L('型号','Model'),c.model],[L('底盘','Chassis'),c.chassis],[L('维修组','Repair Team'),rlname(c.repairLocation)],[L('顾客','Customer'),c.customer]])}
     <h2>${esc(L('报告','Report'))}</h2>${kv([[L('开单人','Opened by'),uName(c.createdById,c.createdByName)],[L('报告日期时间','Reported'),dt(c.createdAt)],[L('地点','Location'),c.location],[L('司机','Driver'),c.driverName],[L('司机电话','Driver phone'),c.driverPhone]])}${full(L('问题描述','Problem'),c.issue)}
     ${c.deletedAt?`<h2>${esc(L('已删除','Deleted'))}</h2>${kv([[L('删除人','Deleted by'),c.deletedByName],[L('删除时间','Deleted at'),dt(c.deletedAt)]])}${full(L('删除原因','Reason for deleting'),c.deleteReason)}`:''}
-    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('上班打卡','Clock in'),dt(ckIn(c))],[L('下班打卡','Clock out'),dt(ckOut(c))],[L('共计加班(小时)','Total OT (hrs)'),c.ot]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
+    ${(recsOf(c).length?recsOf(c):[{status:c.status,tech:c.tech}]).map((r,i,arr)=>`<h2>${esc(L('维修记录 ','Repair record '))}${i+1}</h2>${kv([[L('工作状态','Work status'),sname(r.status||c.status)],[L('维修技师','Technician'),r.tech],[L('上班打卡','Clock in'),dt(r.clockIn||'')],[L('下班打卡','Clock out'),dt(r.clockOut||'')],[L('共计加班(小时)','Total OT (hrs)'),r.ot]])}${full(L('完成的工作描述','Description of Work Done'),r.workDone)}${full(L('使用的零件','Parts Used'),r.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),r.partsRequired)}`).join('')}
     ${ph?`<h2>${esc(L('照片','Photos'))} (${(c.photos||[]).length})</h2><div class="pgrid">${ph}</div>`:''}
     ${c.status==='completed'&&!c.deletedAt?`<h2>${esc(L('签名','Signatures'))}</h2><div class="sgrow">${sg('mechanic')}${sg('customer')}</div>`:''}</section>`}).join('');
   return `<!doctype html><html lang="${lang==='zh'?'zh':'en'}"><head><meta charset="utf-8"><title>${list.length===1?esc(list[0].caseNo):'Mechanic-jobs-'+fD(new Date().toISOString())}</title>
@@ -585,7 +604,20 @@ async function saveCase(e){
       const ins=await sb.from('cases').insert({...d,id:nid,photos:paths,caseNo:no,status:'open',log:[{at:now,by:me.id,byName:me.name,from:'',to:'open',...(gps?{gps}:{})}],createdAt:now,createdById:me.id,createdByName:me.name,claimedById:'',claimedByName:'',claimedAt:''});
       if(ins.error)throw ins.error;
     }else{
-      if(canEditWork(c)){Object.assign(d,{status:g('#c_st'),tech:g('#c_te'),workDone:g('#c_wd'),partsUsed:g('#c_pu'),partsRequired:g('#c_pr'),ot:(()=>{const o=g('#c_ot');return o===''||o==null?'':String(Number(o))})()})}
+      if(canEditWork(c)){
+        const Ly=recLayout(c);const recs=Ly.rs.map(r=>({...r}));let chg=false;
+        const K=['status','tech','workDone','partsUsed','partsRequired','ot'];
+        for(let i=0;i<Ly.n;i++){
+          const wd=$('#r'+i+'_wd');if(!wd||wd.disabled)continue;
+          const ot=g('#r'+i+'_ot');
+          const nr={...(recs[i]||{}),status:g('#r'+i+'_st'),tech:g('#r'+i+'_te'),workDone:g('#r'+i+'_wd'),partsUsed:g('#r'+i+'_pu'),partsRequired:g('#r'+i+'_pr'),ot:ot===''||ot==null?'':String(Number(ot))};
+          const old=recs[i];
+          if(old){if(K.every(k=>String(old[k]??'')===String(nr[k]??'')))continue}
+          else if(!(nr.workDone||nr.partsUsed||nr.partsRequired||nr.ot||nr.status!==c.status))continue;
+          Object.assign(nr,{at:now,by:me.id,byName:me.name});recs[i]=nr;chg=true}
+        if(chg){d.records=recs;d.ot=otSum({records:recs})}
+        const es=$('#r'+Ly.ei+'_st');if(es&&!es.disabled){d.status=es.value;const t=g('#r'+Ly.ei+'_te');if(t!=null)d.tech=t}
+      }
       if(isMgr()&&$('#c_cb')){const id=$('#c_cb').value;if(id!==(c.claimedById||'')){d.claimedById=id;d.claimedByName=uName(id);d.claimedAt=id?now:'';if(id&&c.status==='open'&&(!d.status||d.status==='open'))d.status='claimed';if(!id&&c.status!=='completed')d.status='open'}}
       Object.assign(d,{updatedAt:now,updatedById:me.id,updatedByName:me.name});
       let gps=null;const changed=d.status&&d.status!==c.status;
@@ -609,15 +641,19 @@ function delDialog(id){
     try{const up=await sb.from('cases').update({deletedAt:now,deletedById:me.id,deletedByName:me.name,deleteReason:r,updatedAt:now,updatedById:me.id,updatedByName:me.name,log:[...(c.log||[]),{at:now,by:me.id,byName:me.name,from:c.status,to:'deleted',reason:r}]}).eq('id',id).select();
       if(up.error||!up.data.length)throw up.error||new Error('denied');closeModal();toast(L('已删除','Deleted'));refreshData()}
     catch(x){$('#dl_e').textContent=L('删除失败','Delete failed')}}}
-async function clock(f){
-  const c=cases.find(x=>x.id===modal.id);if(!c||!canEditWork(c))return;
-  const lg=[...(c.log||[])];if(!lg.length)return;
-  const last={...lg[lg.length-1]};
-  if(last[f]&&!isMgr()){toast(L('此状态已打卡，只有管理员可以修改','Already recorded for this status. Only an admin can change it.'));return}
-  const now=new Date().toISOString();last[f]=now;lg[lg.length-1]=last;
-  try{const up=await sb.from('cases').update({log:lg,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',c.id).select();
+async function clock(f,i){
+  i=+i;const c=cases.find(x=>x.id===modal.id);if(!c||!canEditWork(c))return;
+  const Ly=recLayout(c);if(!isMgr()&&i!==Ly.ei)return;
+  const now=new Date().toISOString();const recs=Ly.rs.map(r=>({...r}));let r=recs[i];
+  if(r){r={...r}}else{
+    if(i!==recs.length)return;
+    const st=$('#r'+i+'_st'),te=$('#r'+i+'_te');
+    r={status:st?st.value:c.status,tech:(te&&te.value)||c.tech||me.name,workDone:'',partsUsed:'',partsRequired:'',ot:'',at:now,by:me.id,byName:me.name}}
+  if(r[f]&&!isMgr()){toast(L('此记录已打卡，只有管理员可以修改','Already recorded. Only an admin can change it.'));return}
+  r[f]=now;recs[i]=r;
+  try{const up=await sb.from('cases').update({records:recs,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',c.id).select();
     if(up.error||!up.data.length)throw up.error||new Error('denied');
-    const el=$(f==='clockIn'?'#ck_in':'#ck_out');if(el)el.textContent=fD(now)+' '+fT(now);
+    const el=$((f==='clockIn'?'#ck_in_':'#ck_out_')+i);if(el)el.textContent=fD(now)+' '+fT(now);
     toast(f==='clockIn'?L('已上班打卡','Clocked in'):L('已下班打卡','Clocked out'));refreshData()}
   catch(x){toast(L('打卡失败','Clock failed'))}}
 async function claim(id){
@@ -708,8 +744,8 @@ document.addEventListener('click',e=>{
   else if(a==='claim')claim(v);
   else if(a==='assign')assignDialog(v);
   else if(a==='del')delDialog(v);
-  else if(a==='clockin')clock('clockIn');
-  else if(a==='clockout')clock('clockOut');
+  else if(a==='clockin')clock('clockIn',v);
+  else if(a==='clockout')clock('clockOut',v);
   else if(a==='close')closeModal();
   else if(a==='washare'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen('',caseSummary(c))}
   else if(a==='wadriver'){const c=cases.find(x=>x.id===SG.caseId);c&&waOpen(waNum(c.driverPhone),driverMsg(c))}
