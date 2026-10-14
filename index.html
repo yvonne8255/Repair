@@ -182,6 +182,9 @@ let listsTried=false;
 async function fetchAll(t,cols,ord){const o=[];for(let i=0;;i+=1000){const r=await sb.from(t).select(cols).order(ord).range(i,i+999);if(r.error)throw r.error;o.push(...r.data);if(r.data.length<1000)break}return o}
 async function refreshLists(){
   try{await sb.functions.invoke('sync-lists',{body:{}})}catch(e){}
+  await reloadLists()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof me!=='undefined'&&me)refreshLists()});
+async function reloadLists(){
   try{
     const v=await fetchAll('vehicles','*','no');
     if(v.length){VEH.length=0;v.forEach(x=>VEH.push([x.no,x.org,x.serial,x.subType,x.make,x.model,x.chassis,x.lm]));Object.keys(VMAP).forEach(k=>delete VMAP[k]);VEH.forEach(x=>VMAP[x[0].toUpperCase()]=x)}
@@ -546,7 +549,9 @@ async function saveCase(e){
   e.preventDefault();const c=cases.find(x=>x.id===modal.id);const isNew=!c;const err=$('#c_err');
   const g=id=>{const el=$(id);return el?el.value.trim():undefined};
   const editR=isNew||canEditReport(c);
-  const v=VMAP[(g('#c_veh')||'').toUpperCase()];
+  let v=VMAP[(g('#c_veh')||'').toUpperCase()];
+  if(!v&&editR){await refreshLists();v=VMAP[(g('#c_veh')||'').toUpperCase()]}
+  if(!v&&c&&(g('#c_veh')||'').toUpperCase()===(c.vehicleNo||'').toUpperCase())v=[c.vehicleNo,c.org,c.serialNo,c.subType,c.make,c.model,c.chassis,c.lmNo];
   if(editR){
     if(!v){err.textContent=L('请从车辆列表选择有效的车牌。','Choose a valid vehicle number from the list.');return}
     if(!g('#c_rl')){err.textContent=L('请选择维修组。','Choose a repair team.');return}
