@@ -137,6 +137,8 @@ const rname=r=>RN[r]?RN[r][lang==='zh'?0:1]:r;
 const STS=['open','claimed','in_progress','waiting_parts','completed'];
 const SN={deleted:['已删除','Deleted'],open:['待领取','Open'],claimed:['已分配','Assigned'],in_progress:['维修中','In progress'],waiting_parts:['等待零件','Waiting parts'],completed:['已完成','Completed']};
 const SH={deleted:350,open:5,claimed:195,in_progress:38,waiting_parts:290,completed:145};
+const curLog=c=>{const l=c.log||[];return l[l.length-1]||{}};
+const ckIn=c=>curLog(c).clockIn||'',ckOut=c=>curLog(c).clockOut||'';
 const stOf=c=>c.deletedAt?'deleted':c.status;
 const sname=s=>SN[s]?SN[s][lang==='zh'?0:1]:s;
 const UN='__none';
@@ -295,7 +297,7 @@ function tableFor(rows){
    ${td(c.caseNo,'mono')}<td>${sChip(stOf(c))}</td>${td(fD(c.createdAt))}${td(fT(c.createdAt))}${td(uLabel(c.createdById,c.createdByName))}
    ${td(c.vehicleNo,'mono')}${td(c.lmNo,'mono')}${td(c.org)}${td(c.serialNo,'mono')}<td>${c.subType?tyChip(c.subType):'<span style="color:var(--mute)">—</span>'}</td>${td(c.make)}${td(c.model)}${td(c.chassis,'mono')}${td(c.customer)}${td(c.location,'long')}${td(c.driverName)}${td(c.driverPhone,'mono')}${td(c.issue,'long')}${td((c.photos||[]).length?String(c.photos.length):'')}
    ${td(uLabel(c.claimedById,c.claimedByName))}${td(fD(c.claimedAt))}${td(fT(c.claimedAt))}${td(uLabel(c.updatedById,c.updatedByName))}${td(fD(c.updatedAt))}${td(fT(c.updatedAt))}${lastGps(c)?`<td><a href="${mapUrl(lastGps(c))}" target="_blank" rel="noopener" style="color:var(--title)">${esc(gpsTxt(lastGps(c)))}</a></td>`:'<td class="nil">—</td>'}
-   ${td(c.tech)}${td(c.clockIn?fD(c.clockIn)+' '+fT(c.clockIn):'')}${td(c.clockOut?fD(c.clockOut)+' '+fT(c.clockOut):'')}${td(c.ot)}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}${td(c.deletedAt?(c.deletedByName||'')+' · '+fD(c.deletedAt)+' '+fT(c.deletedAt):'')}${td(c.deleteReason,'long')}</tr>`).join('')}</tbody></table></div>`;
+   ${td(c.tech)}${td(ckIn(c)?fD(ckIn(c))+' '+fT(ckIn(c)):'')}${td(ckOut(c)?fD(ckOut(c))+' '+fT(ckOut(c)):'')}${td(c.ot)}${td(c.workDone,'long')}${td(c.partsUsed,'long')}${td(c.partsRequired,'long')}${td(sigTxt(c,'mechanic'))}${td(sigTxt(c,'customer'))}${td(c.deletedAt?(c.deletedByName||'')+' · '+fD(c.deletedAt)+' '+fT(c.deletedAt):'')}${td(c.deleteReason,'long')}</tr>`).join('')}</tbody></table></div>`;
 }
 function usersView(){
   const rows=[...users].sort((a,b)=>(a.status==='pending'?0:1)-(b.status==='pending'?0:1)||(b.createdAt||'').localeCompare(a.createdAt||''));
@@ -323,7 +325,7 @@ function caseModal(c){
   openModal(`<h3>${isNew?L('报告车辆问题','Report a vehicle problem'):`<span class="mono">${esc(c.caseNo)}</span> ${sChip(stOf(c))} ${rlChip(c.repairLocation)} ${tyChip(c.subType)}`}</h3>
   ${isNew?'':`<p class="meta"><span>${L('开单','Opened by')}: <b>${esc(uLabel(c.createdById,c.createdByName))}</b> ${fD(c.createdAt)} ${fT(c.createdAt)}</span><span>${L('指派给','Assigned to')}: <b>${c.claimedById?esc(uLabel(c.claimedById,c.claimedByName)):'—'}</b> ${fD(c.claimedAt)} ${fT(c.claimedAt)}</span>${c.updatedAt?`<span>${L('最后更新','Last update')}: <b>${esc(uLabel(c.updatedById,c.updatedByName))}</b> ${fD(c.updatedAt)} ${fT(c.updatedAt)}</span>`:''}</p>
   ${!isNew&&c.deletedAt?`<p class="meta" style="color:#b00020"><span>${L('已删除','Deleted')}: <b>${esc(c.deletedByName||'')}</b> ${fD(c.deletedAt)} ${fT(c.deletedAt)}</span><span>${L('原因','Reason')}: <b>${esc(c.deleteReason||'')}</b></span></p>`:''}
-  ${(c.log||[]).length?`<div class="meta" style="flex-direction:column;gap:3px"><b>${L('状态记录','Status history')}</b>${histRows(c).reverse().map(x=>`<span><b>${esc(sname(x.status))}</b> · ${L('开始','Start')} ${fD(x.start)} ${fT(x.start)} · ${L('结束','End')} ${x.end?fD(x.end)+' '+fT(x.end):'—'} · ${esc(uName(x.by,x.byName))}${x.gps?` · <a href="${mapUrl(x.gps)}" target="_blank" rel="noopener" style="color:var(--title)">GPS ${esc(gpsTxt(x.gps))}</a>`:''}</span>`).join('')}</div>`:''}`}
+  ${(c.log||[]).length?`<div class="meta" style="flex-direction:column;gap:3px"><b>${L('状态记录','Status history')}</b>${histRows(c).reverse().map(x=>`<span><b>${esc(sname(x.status))}</b> · ${L('开始','Start')} ${fD(x.start)} ${fT(x.start)} · ${L('结束','End')} ${x.end?fD(x.end)+' '+fT(x.end):'—'} · ${L('上班','Clock in')} ${x.ci?fD(x.ci)+' '+fT(x.ci):'—'} · ${L('下班','Clock out')} ${x.co?fD(x.co)+' '+fT(x.co):'—'} · ${esc(uName(x.by,x.byName))}${x.gps?` · <a href="${mapUrl(x.gps)}" target="_blank" rel="noopener" style="color:var(--title)">GPS ${esc(gpsTxt(x.gps))}</a>`:''}</span>`).join('')}</div>`:''}`}
   ${!isNew&&!eR&&!eW?`<p class="meta">${L('只读：只有开单人（未被接单时）、被指派的维修员/主管（仅维修记录）和管理员可以更改。','Read only: only the opener (before it is taken), the assigned mechanic / supervisor (repair record only) and admins can change this.')}</p>`:''}
   <form id="cf">
   <fieldset><legend>${L('车辆与报告','Vehicle & report')}</legend><div class="g">
@@ -344,8 +346,8 @@ function caseModal(c){
    ${fld('c_wd',L('完成的工作描述 Description of Work Done','Description of Work Done'),c.workDone||'',{type:'textarea',w:1,dis:!eW})}
    ${fld('c_pu',L('使用的零件 Parts Used','Parts Used'),c.partsUsed||'',{type:'textarea',w:1,dis:!eW})}
    ${fld('c_pr',L('所需零件（采购用）Parts Required (For Purchasing)','Parts Required (For Purchasing)'),c.partsRequired||'',{type:'textarea',w:1,dis:!eW})}
-   <div class="f"><label>${L('上班打卡 Clock in','Clock in')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_in" class="mono">${c.clockIn?fD(c.clockIn)+' '+fT(c.clockIn):'—'}</span><button type="button" class="btn sm" data-act="clockin" ${eW?'':'disabled'}>${L('上班打卡','Clock in')}</button></div></div>
-   <div class="f"><label>${L('下班打卡 Clock out','Clock out')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_out" class="mono">${c.clockOut?fD(c.clockOut)+' '+fT(c.clockOut):'—'}</span><button type="button" class="btn sm" data-act="clockout" ${eW?'':'disabled'}>${L('下班打卡','Clock out')}</button></div></div>
+   <div class="f"><label>${L('上班打卡 Clock in（当前状态：','Clock in (current status: ')}${esc(sname(c.status))}${L('）',')')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_in" class="mono">${ckIn(c)?fD(ckIn(c))+' '+fT(ckIn(c)):'—'}</span><button type="button" class="btn sm" data-act="clockin" ${eW?'':'disabled'}>${L('上班打卡','Clock in')}</button></div></div>
+   <div class="f"><label>${L('下班打卡 Clock out（当前状态：','Clock out (current status: ')}${esc(sname(c.status))}${L('）',')')}</label><div style="display:flex;gap:8px;align-items:center"><span id="ck_out" class="mono">${ckOut(c)?fD(ckOut(c))+' '+fT(ckOut(c)):'—'}</span><button type="button" class="btn sm" data-act="clockout" ${eW?'':'disabled'}>${L('下班打卡','Clock out')}</button></div></div>
    ${fld('c_ot',L('共计加班（小时）','Total overtime (hrs)'),c.ot??'',{type:'number',dis:!eW,attrs:'min="0" step="0.5"'})}
   </div></fieldset>`}
   ${isNew?'':`<fieldset id="sgf" ${c.status==='completed'?'':'hidden'}><legend>${L('签名','Signatures')}</legend><div class="g" id="sgg"></div></fieldset>`}
@@ -384,7 +386,7 @@ const mapUrl=g=>'https://www.google.com/maps?q='+g.lat+','+g.lng;
 const gpsTxt=g=>g?(g.addr||g.lat+', '+g.lng):'';
 function lastGps(c){const l=[...(c.log||[])].reverse().find(x=>x.gps);return l?l.gps:null}
 function histRows(c){const l=[...(c.log||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
-  return l.map((x,i)=>({status:x.to,start:x.at,end:l[i+1]?l[i+1].at:'',by:x.by,byName:x.byName,gps:x.gps}))}
+  return l.map((x,i)=>({status:x.to,start:x.at,end:l[i+1]?l[i+1].at:'',by:x.by,byName:x.byName,gps:x.gps,ci:x.clockIn,co:x.clockOut}))}
 let gpsP=null;
 const APP_URL='https://mechanic-board.vercel.app';
 const waNum=p=>{let d=String(p||'').replace(/[^0-9]/g,'');if(!d)return'';if(d.length===8)d='65'+d;return d};
@@ -508,7 +510,7 @@ function reportHtml(list,urls){
     <h2>${esc(L('车辆','Vehicle'))}</h2>${kv([['Vehicle No.',c.vehicleNo],['LM / LP No.',c.lmNo],[L('机构','Organization'),c.org],[L('设备序列号','Equipment Serial No.'),c.serialNo],[L('类型','Vehicle Sub Type'),c.subType],[L('品牌','Make'),c.make],[L('型号','Model'),c.model],[L('底盘','Chassis'),c.chassis],[L('维修组','Repair Team'),rlname(c.repairLocation)],[L('顾客','Customer'),c.customer]])}
     <h2>${esc(L('报告','Report'))}</h2>${kv([[L('开单人','Opened by'),uName(c.createdById,c.createdByName)],[L('报告日期时间','Reported'),dt(c.createdAt)],[L('地点','Location'),c.location],[L('司机','Driver'),c.driverName],[L('司机电话','Driver phone'),c.driverPhone]])}${full(L('问题描述','Problem'),c.issue)}
     ${c.deletedAt?`<h2>${esc(L('已删除','Deleted'))}</h2>${kv([[L('删除人','Deleted by'),c.deletedByName],[L('删除时间','Deleted at'),dt(c.deletedAt)]])}${full(L('删除原因','Reason for deleting'),c.deleteReason)}`:''}
-    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('上班打卡','Clock in'),dt(c.clockIn)],[L('下班打卡','Clock out'),dt(c.clockOut)],[L('共计加班(小时)','Total OT (hrs)'),c.ot]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
+    <h2>${esc(L('维修记录','Repair record'))}</h2>${kv([[L('工作状态','Work status'),sname(c.status)],[L('维修技师','Technician'),c.tech],[L('上班打卡','Clock in'),dt(ckIn(c))],[L('下班打卡','Clock out'),dt(ckOut(c))],[L('共计加班(小时)','Total OT (hrs)'),c.ot]])}${full(L('完成的工作描述','Description of Work Done'),c.workDone)}${full(L('使用的零件','Parts Used'),c.partsUsed)}${full(L('所需零件（采购用）','Parts Required (For Purchasing)'),c.partsRequired)}
     ${ph?`<h2>${esc(L('照片','Photos'))} (${(c.photos||[]).length})</h2><div class="pgrid">${ph}</div>`:''}
     ${c.status==='completed'&&!c.deletedAt?`<h2>${esc(L('签名','Signatures'))}</h2><div class="sgrow">${sg('mechanic')}${sg('customer')}</div>`:''}</section>`}).join('');
   return `<!doctype html><html lang="${lang==='zh'?'zh':'en'}"><head><meta charset="utf-8"><title>${list.length===1?esc(list[0].caseNo):'Mechanic-jobs-'+fD(new Date().toISOString())}</title>
@@ -609,9 +611,11 @@ function delDialog(id){
     catch(x){$('#dl_e').textContent=L('删除失败','Delete failed')}}}
 async function clock(f){
   const c=cases.find(x=>x.id===modal.id);if(!c||!canEditWork(c))return;
-  if(c[f]&&!isMgr()){toast(L('已打卡，只有管理员可以修改','Already recorded. Only an admin can change it.'));return}
-  const now=new Date().toISOString();
-  try{const up=await sb.from('cases').update({[f]:now,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',c.id).select();
+  const lg=[...(c.log||[])];if(!lg.length)return;
+  const last={...lg[lg.length-1]};
+  if(last[f]&&!isMgr()){toast(L('此状态已打卡，只有管理员可以修改','Already recorded for this status. Only an admin can change it.'));return}
+  const now=new Date().toISOString();last[f]=now;lg[lg.length-1]=last;
+  try{const up=await sb.from('cases').update({log:lg,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',c.id).select();
     if(up.error||!up.data.length)throw up.error||new Error('denied');
     const el=$(f==='clockIn'?'#ck_in':'#ck_out');if(el)el.textContent=fD(now)+' '+fT(now);
     toast(f==='clockIn'?L('已上班打卡','Clocked in'):L('已下班打卡','Clocked out'));refreshData()}
