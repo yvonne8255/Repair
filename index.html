@@ -327,8 +327,9 @@ function caseModal(c){
   ${!isNew&&!eR&&!eW?`<p class="meta">${L('只读：只有开单人（未被接单时）、被指派的维修员/主管（仅维修记录）和管理员可以更改。','Read only: only the opener (before it is taken), the assigned mechanic / supervisor (repair record only) and admins can change this.')}</p>`:''}
   <form id="cf">
   <fieldset><legend>${L('车辆与报告','Vehicle & report')}</legend><div class="g">
-   <div class="f"><label for="c_veh">${L('车牌 Vehicle No.','Vehicle No.')} <i>*</i></label><div style="position:relative"><input id="c_veh" value="${esc(c.vehicleNo||'')}" autocomplete="off" placeholder="${L('点击选择或输入车牌','Click to choose or type')}" ${eR?'':'disabled'}><div id="vlist" class="vlist" hidden></div></div></div>
-   ${ro('LM / LP No.',v[7]||c.lmNo,'r_lm')}${ro(L('机构 Organization','Organization'),v[1]||c.org,'r_org')}${ro(L('设备序列号 Equipment Serial No.','Equipment Serial No.'),v[2]||c.serialNo,'r_sn')}${ro(L('类型 Vehicle Sub Type','Vehicle Sub Type'),v[3]||c.subType,'r_type')}${ro(L('品牌 Make','Make'),v[4]||c.make,'r_make')}${ro(L('型号 Model','Model'),v[5]||c.model,'r_model')}${ro(L('底盘 Chassis','Chassis'),v[6]||c.chassis,'r_ch')}
+   <div class="f"><label for="c_veh">${L('车牌 Vehicle No.（与 LM / LP 二选一）','Vehicle No. (choose either one)')} <i>*</i></label><div style="position:relative"><input id="c_veh" value="${esc(c.vehicleNo||'')}" autocomplete="off" placeholder="${L('点击选择或输入车牌','Click to choose or type')}" ${eR?'':'disabled'}><div id="vlist" class="vlist" hidden></div></div></div>
+   <div class="f"><label for="c_lm">${L('LM / LP No.（与车牌二选一）','LM / LP No. (choose either one)')}</label><div style="position:relative"><input id="c_lm" value="${esc(v[7]||c.lmNo||'')}" autocomplete="off" placeholder="${L('点击选择或输入 LM / LP 号码','Click to choose or type')}" ${eR?'':'disabled'}><div id="llist" class="vlist" hidden></div></div></div>
+   ${ro(L('机构 Organization','Organization'),v[1]||c.org,'r_org')}${ro(L('设备序列号 Equipment Serial No.','Equipment Serial No.'),v[2]||c.serialNo,'r_sn')}${ro(L('类型 Vehicle Sub Type','Vehicle Sub Type'),v[3]||c.subType,'r_type')}${ro(L('品牌 Make','Make'),v[4]||c.make,'r_make')}${ro(L('型号 Model','Model'),v[5]||c.model,'r_model')}${ro(L('底盘 Chassis','Chassis'),v[6]||c.chassis,'r_ch')}
    <div class="f"><label for="c_rl">${L('维修组 Repair Team','Repair Team')} <i>*</i></label><select id="c_rl" ${eR?'':'disabled'}><option value="">—</option>${RLS.map(r=>`<option value="${r}" ${c.repairLocation===r?'selected':''}>${esc(rlname(r))}</option>`).join('')}</select></div>
    <div class="f"><label for="c_cus">${L('顾客（可选，可自由填写）','Customer (optional, free text)')}</label><input id="c_cus" list="cl" value="${esc(c.customer||'')}" autocomplete="off" ${eR?'':'disabled'}><datalist id="cl">${customers.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
    ${fld('c_loc',L('地点','Location'),c.location||'',{req:1,dis:!eR})}
@@ -361,9 +362,18 @@ function caseModal(c){
   vi.addEventListener('input',()=>{fillVeh();showList(vi.value)});
   vl.addEventListener('mousedown',e=>{const b=e.target.closest('[data-vno]');if(b){e.preventDefault();vi.value=b.dataset.vno;vl.hidden=true;fillVeh()}});
   vi.addEventListener('blur',()=>setTimeout(()=>{vl.hidden=true},100));
+  const lmi=$('#c_lm'),ll=$('#llist');
+  const lmFind=q=>q?VEH.find(x=>(x[7]||'').toUpperCase()===q.trim().toUpperCase()):null;
+  const showLm=filter=>{const q=filter.trim().toUpperCase();const m=VEH.filter(x=>x[7]&&(!q||x[7].toUpperCase().includes(q)||x[0].toUpperCase().includes(q)));
+    ll.innerHTML=m.length?m.slice(0,300).map(x=>`<button type="button" class="vopt" data-lm="${esc(x[7])}" data-vno="${esc(x[0])}"><b class="mono">${esc(x[7])}</b> <span>${esc(x[0])}</span> <small>${esc(x[3]||'—')}</small></button>`).join(''):`<div class="vopt">${L('没有符合的车辆','No matching vehicle')}</div>`;ll.hidden=false};
+  lmi.addEventListener('focus',()=>{if(!lmi.disabled)showLm('')});
+  lmi.addEventListener('input',()=>{const x=lmFind(lmi.value);if(x){vi.value=x[0]}fillVeh();showLm(lmi.value)});
+  ll.addEventListener('mousedown',e=>{const b=e.target.closest('[data-lm]');if(b){e.preventDefault();lmi.value=b.dataset.lm;vi.value=b.dataset.vno;ll.hidden=true;fillVeh()}});
+  lmi.addEventListener('blur',()=>setTimeout(()=>{ll.hidden=true},100));
 }
 function fillVeh(){const v=VMAP[$('#c_veh').value.trim().toUpperCase()]||[];
-  const set=(id,x)=>{$(id).textContent=x||'—'};set('#r_lm',v[7]);set('#r_type',v[3]);set('#r_org',v[1]);set('#r_sn',v[2]);set('#r_make',v[4]);set('#r_model',v[5]);set('#r_ch',v[6])}
+  const lmEl=$('#c_lm');if(lmEl&&v[0])lmEl.value=v[7]||'';
+  const set=(id,x)=>{$(id).textContent=x||'—'};set('#r_type',v[3]);set('#r_org',v[1]);set('#r_sn',v[2]);set('#r_make',v[4]);set('#r_model',v[5]);set('#r_ch',v[6])}
 
 function getGps(){return new Promise(res=>{
   if(!navigator.geolocation)return res(null);
@@ -554,11 +564,12 @@ async function saveCase(e){
   e.preventDefault();const c=cases.find(x=>x.id===modal.id);const isNew=!c;const err=$('#c_err');
   const g=id=>{const el=$(id);return el?el.value.trim():undefined};
   const editR=isNew||canEditReport(c);
-  let v=VMAP[(g('#c_veh')||'').toUpperCase()];
-  if(!v&&editR){await refreshLists();v=VMAP[(g('#c_veh')||'').toUpperCase()]}
+  const lmQ=(g('#c_lm')||'').toUpperCase(),findV=()=>VMAP[(g('#c_veh')||'').toUpperCase()]||(lmQ?VEH.find(x=>(x[7]||'').toUpperCase()===lmQ):null)||undefined;
+  let v=findV();
+  if(!v&&editR){await refreshLists();v=findV()}
   if(!v&&c&&(g('#c_veh')||'').toUpperCase()===(c.vehicleNo||'').toUpperCase())v=[c.vehicleNo,c.org,c.serialNo,c.subType,c.make,c.model,c.chassis,c.lmNo];
   if(editR){
-    if(!v){err.textContent=L('请从车辆列表选择有效的车牌。','Choose a valid vehicle number from the list.');return}
+    if(!v){err.textContent=L('请从列表选择有效的车牌或 LM / LP 号码。','Choose a valid Vehicle No. or LM / LP No. from the list.');return}
     if(!g('#c_rl')){err.textContent=L('请选择维修组。','Choose a repair team.');return}
     if(!g('#c_loc')||!g('#c_dn')||!g('#c_dp')||!g('#c_is')){err.textContent=L('请填写所有必填项（*）。','Fill in all required fields (*).');return}}
   const now=new Date().toISOString();let d={};let notifyInfo=null;
