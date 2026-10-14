@@ -139,7 +139,7 @@ const SN={deleted:['已删除','Deleted'],open:['待领取','Open'],claimed:['�
 const SH={deleted:350,open:5,claimed:195,in_progress:38,waiting_parts:290,completed:145};
 const curLog=c=>{const l=c.log||[];return l[l.length-1]||{}};
 const REC_MAX=10;
-const recFilled=r=>!!(r&&((r.workDone||'').trim()||(r.partsUsed||'').trim()||(r.partsRequired||'').trim()));
+const recFilled=r=>!!(r&&((r.workDone||'').trim()||(r.partsUsed||'').trim()||(r.partsRequired||'').trim()||r.clockOut));
 const recsOf=c=>{if(Array.isArray(c.records)&&c.records.length)return c.records;
   if(c.workDone||c.partsUsed||c.partsRequired||c.ot)return[{status:c.status,tech:c.tech,workDone:c.workDone,partsUsed:c.partsUsed,partsRequired:c.partsRequired,ot:c.ot,clockIn:'',clockOut:''}];return[]};
 const recLayout=c=>{const rs=recsOf(c),len=rs.length;const n=len===0?1:Math.min(REC_MAX,len+(recFilled(rs[len-1])?1:0));return{rs,len,n,ei:n-1}};
@@ -650,6 +650,8 @@ async function clock(f,i){
     const st=$('#r'+i+'_st'),te=$('#r'+i+'_te');
     r={status:st?st.value:c.status,tech:(te&&te.value)||c.tech||me.name,workDone:'',partsUsed:'',partsRequired:'',ot:'',at:now,by:me.id,byName:me.name}}
   if(r[f]&&!isMgr()){toast(L('此记录已打卡，只有管理员可以修改','Already recorded. Only an admin can change it.'));return}
+  const fv=id=>{const e=$('#r'+i+'_'+id);return e&&!e.disabled?e.value.trim():null};
+  if(r.workDone!==undefined||true){const m={te:'tech',wd:'workDone',pu:'partsUsed',pr:'partsRequired'};for(const k in m){const x=fv(k);if(x!==null)r[m[k]]=x}const o=fv('ot');if(o!==null)r.ot=o===''?'':String(Number(o))}
   r[f]=now;recs[i]=r;
   try{const up=await sb.from('cases').update({records:recs,updatedAt:now,updatedById:me.id,updatedByName:me.name}).eq('id',c.id).select();
     if(up.error||!up.data.length)throw up.error||new Error('denied');
